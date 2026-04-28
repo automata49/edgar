@@ -11,6 +11,17 @@ class MonitoringScheduler:
         self.bot = bot
         self.scheduler = None
         
+        # Supabase DB
+        supabase_url = config.get('supabase_url')
+        supabase_key = config.get('supabase_key')
+        if supabase_url and supabase_key:
+            from database import SupabaseDB
+            self.db = SupabaseDB(supabase_url, supabase_key)
+            print("✅ Supabase 연결 완료")
+        else:
+            self.db = None
+            print("⚠️  Supabase 비활성화 (환경변수 없음)")
+
         print("\n" + "="*60)
         print("🔧 수집기 초기화 중...")
         print("="*60 + "\n")
@@ -121,7 +132,29 @@ class MonitoringScheduler:
             analysis = self.analyzer.analyze_data(youtube_data, website_data, market_data)
             print("✅ AI 분석 완료\n")
             
-            # === 5. 리포트 저장 (챗봇용) ===
+            # === 5. Supabase 저장 ===
+            if self.db:
+                try:
+                    # 카테고리 매핑 (symbol → category)
+                    from collectors.market_data_collector import MarketDataCollector
+                    category_map = {
+                        name: cat
+                        for cat, symbols in MarketDataCollector(self.config).symbols.items()
+                        for name in symbols
+                    }
+                    n_market  = self.db.save_market_data(market_data, category_map)
+                    n_youtube = self.db.save_youtube_videos(youtube_data)
+                    n_news    = self.db.save_news_articles(website_data)
+                    report_id = self.db.save_report(
+                        analysis,
+                        {'youtube_count': len(youtube_data), 'website_count': len(website_data)},
+                        market_data,
+                    )
+                    print(f"💾 DB 저장: 시장 {n_market}건, YouTube {n_youtube}건, 뉴스 {n_news}건, 리포트 #{report_id}\n")
+                except Exception as e:
+                    print(f"   ⚠️  DB 저장 실패: {e}\n")
+
+            # === 7. 리포트 저장 (챗봇용) ===
             try:
                 with open('/tmp/latest_report.txt', 'w', encoding='utf-8') as f:
                     f.write(f"수집 날짜: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n")
@@ -144,7 +177,7 @@ class MonitoringScheduler:
             except Exception as e:
                 print(f"   ⚠️  리포트 저장 실패: {str(e)}\n")
             
-            # === 6. 리포트 발송 ===
+            # === 8. 리포트 발송 ===
             recipients = self.config.get('report_recipients', [])
             
             print(f"📤 리포트 발송 ({len(recipients)}명)...")

@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edgar AI — 시스템 구조</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --paper:  #f5edd6;
+      --paper2: #ece3c4;
+      --rust:   #8c3a18;
+      --sepia:  #7a5220;
+      --olive:  #4a5e30;
+      --amber:  #b07c18;
+      --green:  #3d6b20;
+      --ink:    #271508;
+      --muted:  #7b5535;
+      --glass:  rgba(245,237,214,0.93);
+      --border: rgba(140,58,24,0.20);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background-color: var(--paper);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.78' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+      font-family: 'American Typewriter', 'Courier Prime', 'Courier New', Georgia, serif;
+      color: var(--ink);
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    /* ── Canvas BG ── */
+    #c {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.30;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2.5rem;
+      background: rgba(245,237,214,0.92);
+      backdrop-filter: blur(24px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      font-size: 1.25rem;
+      letter-spacing: 0.12em;
+      background: linear-gradient(120deg, var(--rust), var(--sepia));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-decoration: none;
+    }
+    .nav-right { display: flex; align-items: center; gap: 1.4rem; }
+    .nav-right a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.82rem;
+      letter-spacing: 0.06em;
+      transition: color .2s;
+    }
+    .nav-right a:hover { color: var(--rust); }
+    .nav-tag {
+      font-size: 0.7rem;
+      padding: 0.25rem 0.8rem;
+      border: 1px solid rgba(74,94,48,0.38);
+      border-radius: 20px;
+      color: var(--olive);
+      letter-spacing: 0.12em;
+    }
+
+    /* ── Layout ── */
+    .page {
+      position: relative;
+      z-index: 1;
+      padding: 7rem 2rem 5rem;
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    /* ── Page header ── */
+    .page-hd {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+    .page-tag {
+      font-size: 0.72rem;
+      letter-spacing: 0.22em;
+      color: var(--olive);
+      text-transform: uppercase;
+      margin-bottom: 0.7rem;
+    }
+    .page-title {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 700;
+      margin-bottom: 0.8rem;
+      color: var(--ink);
+    }
+    .page-desc {
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.7;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    /* ── Architecture diagram ── */
+    .arch {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    /* ── Layer ── */
+    .layer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0;
+    }
+
+    .layer-label {
+      font-size: 0.68rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      padding: 0.3rem 1.1rem;
+      border-radius: 20px;
+      font-weight: 600;
+      border: 1px solid;
+    }
+    .lbl-ext    { color: var(--muted);  border-color: rgba(123,85,53,0.30); background: rgba(123,85,53,0.06); }
+    .lbl-collect{ color: var(--rust);   border-color: rgba(140,58,24,0.30); background: rgba(140,58,24,0.06); }
+    .lbl-analyze{ color: var(--sepia);  border-color: rgba(122,82,32,0.30); background: rgba(122,82,32,0.06); }
+    .lbl-store  { color: var(--olive);  border-color: rgba(74,94,48,0.30);  background: rgba(74,94,48,0.06);  }
+    .lbl-output { color: var(--amber);  border-color: rgba(176,124,24,0.30);background: rgba(176,124,24,0.06);}
+    .lbl-user   { color: var(--green);  border-color: rgba(61,107,32,0.30); background: rgba(61,107,32,0.06); }
+
+    .layer-row {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0.9rem;
+      width: 100%;
+    }
+
+    /* ── Module card ── */
+    .mod {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1rem 1.4rem;
+      min-width: 155px;
+      max-width: 200px;
+      text-align: center;
+      transition: transform .25s, border-color .25s, box-shadow .25s;
+      cursor: default;
+      position: relative;
+    }
+    .mod:hover { transform: translateY(-4px); }
+    .mod.c-rust:hover   { border-color: rgba(140,58,24,0.50);  box-shadow: 0 8px 36px rgba(140,58,24,0.14); }
+    .mod.c-sepia:hover  { border-color: rgba(122,82,32,0.50);  box-shadow: 0 8px 36px rgba(122,82,32,0.14); }
+    .mod.c-olive:hover  { border-color: rgba(74,94,48,0.50);   box-shadow: 0 8px 36px rgba(74,94,48,0.14);  }
+    .mod.c-amber:hover  { border-color: rgba(176,124,24,0.50); box-shadow: 0 8px 36px rgba(176,124,24,0.14);}
+    .mod.c-green:hover  { border-color: rgba(61,107,32,0.50);  box-shadow: 0 8px 36px rgba(61,107,32,0.14); }
+    .mod.c-muted:hover  { border-color: rgba(123,85,53,0.40);  box-shadow: 0 8px 36px rgba(123,85,53,0.10); }
+
+    .mod-icon {
+      font-size: 1.6rem;
+      margin-bottom: 0.4rem;
+      display: block;
+    }
+    .mod-name {
+      font-size: 0.88rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+    .c-rust  .mod-name { color: var(--rust); }
+    .c-sepia .mod-name { color: var(--sepia); }
+    .c-olive .mod-name { color: var(--olive); }
+    .c-amber .mod-name { color: var(--amber); }
+    .c-green .mod-name { color: var(--green); }
+    .c-muted .mod-name { color: var(--muted); }
+
+    .mod-desc {
+      font-size: 0.73rem;
+      color: rgba(123,85,53,0.72);
+      line-height: 1.5;
+    }
+    .mod-tags {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.3rem;
+      margin-top: 0.55rem;
+    }
+    .mtag {
+      font-size: 0.62rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 5px;
+      border: 1px solid;
+    }
+    .mt-rust  { color: var(--rust);  border-color: rgba(140,58,24,0.28);  background: rgba(140,58,24,0.06); }
+    .mt-sepia { color: var(--sepia); border-color: rgba(122,82,32,0.28);  background: rgba(122,82,32,0.06); }
+    .mt-olive { color: var(--olive); border-color: rgba(74,94,48,0.28);   background: rgba(74,94,48,0.06);  }
+    .mt-amber { color: var(--amber); border-color: rgba(176,124,24,0.28); background: rgba(176,124,24,0.06);}
+    .mt-green { color: var(--green); border-color: rgba(61,107,32,0.28);  background: rgba(61,107,32,0.06); }
+    .mt-muted { color: var(--muted); border-color: rgba(123,85,53,0.22);  background: rgba(123,85,53,0.05); }
+
+    /* ── Wide cards ── */
+    .mod.wide {
+      min-width: 280px;
+      max-width: 420px;
+      padding: 1.2rem 2rem;
+    }
+
+    /* ── Connector arrows ── */
+    .connector {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 0.25rem 0;
+    }
+    .arrow-down {
+      width: 2px;
+      height: 40px;
+      background: linear-gradient(to bottom, rgba(140,58,24,0.45), rgba(140,58,24,0.06));
+      position: relative;
+    }
+    .arrow-down::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 7px solid rgba(140,58,24,0.45);
+    }
+
+    /* ── Shared sidebar ── */
+    .shared-bar {
+      position: fixed;
+      right: 1.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+    }
+    .shared-pill {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.9rem 0.8rem;
+      text-align: center;
+      min-width: 100px;
+      cursor: default;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .shared-pill:hover {
+      border-color: rgba(74,94,48,0.50);
+      box-shadow: 0 4px 24px rgba(74,94,48,0.10);
+    }
+    .spl-icon { font-size: 1.2rem; display: block; margin-bottom: 0.3rem; }
+    .spl-name { font-size: 0.72rem; color: var(--olive); font-weight: 700; margin-bottom: 0.15rem; }
+    .spl-desc { font-size: 0.62rem; color: var(--muted); line-height: 1.4; }
+
+    /* ── Legend ── */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1.2rem;
+      margin-top: 3.5rem;
+      padding: 1.4rem 2rem;
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── Data flow section ── */
+    .flow-section { margin-top: 4rem; }
+    .flow-title {
+      font-size: 0.72rem;
+      letter-spacing: 0.22em;
+      color: var(--olive);
+      text-transform: uppercase;
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .flow-steps {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      flex-wrap: wrap;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    .flow-step {
+      text-align: center;
+      padding: 0.8rem 1.2rem;
+      min-width: 140px;
+    }
+    .flow-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 2px solid;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.7rem;
+      margin: 0 auto 0.7rem;
+      transition: box-shadow .3s;
+    }
+    .flow-icon:hover { box-shadow: 0 0 28px currentColor; }
+    .fi-rust  { border-color: var(--rust);  background: rgba(140,58,24,0.07);  color: var(--rust);  box-shadow: 0 0 14px rgba(140,58,24,0.22); }
+    .fi-sepia { border-color: var(--sepia); background: rgba(122,82,32,0.07);  color: var(--sepia); box-shadow: 0 0 14px rgba(122,82,32,0.22); }
+    .fi-olive { border-color: var(--olive); background: rgba(74,94,48,0.07);   color: var(--olive); box-shadow: 0 0 14px rgba(74,94,48,0.22);  }
+    .fi-amber { border-color: var(--amber); background: rgba(176,124,24,0.07); color: var(--amber); box-shadow: 0 0 14px rgba(176,124,24,0.22);}
+    .fi-green { border-color: var(--green); background: rgba(61,107,32,0.07);  color: var(--green); box-shadow: 0 0 14px rgba(61,107,32,0.22); }
+
+    .flow-name { font-size: 0.92rem; font-weight: 700; margin-bottom: 0.2rem; color: var(--ink); }
+    .flow-sub  { font-size: 0.75rem; color: var(--muted); }
+    .flow-arrow { font-size: 1.5rem; color: rgba(140,58,24,0.28); flex-shrink: 0; padding: 0 0.2rem; }
+
+    @media (max-width: 700px) {
+      .shared-bar { display: none; }
+      .flow-steps { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+      .mod.wide { min-width: 200px; }
+    }
+
+    /* ── Entrance animation ── */
+    .layer, .connector {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    .anim-ready { opacity: 1; transform: none; transition: opacity .55s ease, transform .55s ease; }
+  </style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<!-- Nav -->
+<nav>
+  <a href="index.html" class="nav-logo">edgar AI</a>
+  <div class="nav-right">
+    <a href="index.html">홈</a>
+    <a href="#flow">데이터 흐름</a>
+    <span class="nav-tag">ARCHITECTURE</span>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- Header -->
+  <div class="page-hd">
+    <div class="page-tag">SYSTEM ARCHITECTURE</div>
+    <h1 class="page-title">Edgar AI 구조 기능도</h1>
+    <p class="page-desc">
+      외부 데이터 수집 → AI 분석 → DB 저장 → 텔레그램 발송까지<br>
+      전체 파이프라인을 한눈에.
+    </p>
+  </div>
+
+  <!-- ─────────────────── ARCHITECTURE ─────────────────── -->
+  <div class="arch">
+
+    <!-- ① 외부 데이터 소스 -->
+    <div class="layer" id="l0">
+      <div class="layer-label lbl-ext">① 외부 데이터 소스</div>
+      <div class="layer-row">
+        <div class="mod c-muted">
+          <span class="mod-icon">📈</span>
+          <div class="mod-name">yfinance</div>
+          <div class="mod-desc">글로벌 주식<br>50+ 심볼</div>
+        </div>
+        <div class="mod c-muted">
+          <span class="mod-icon">🪙</span>
+          <div class="mod-name">CoinGecko</div>
+          <div class="mod-desc">코인 시세<br>실시간 API</div>
+        </div>
+        <div class="mod c-muted">
+          <span class="mod-icon">▶️</span>
+          <div class="mod-name">YouTube API</div>
+          <div class="mod-desc">영상 메타 +<br>자막 수집</div>
+        </div>
+        <div class="mod c-muted">
+          <span class="mod-icon">📰</span>
+          <div class="mod-name">RSS Feed</div>
+          <div class="mod-desc">금융 뉴스<br>feedparser</div>
+        </div>
+        <div class="mod c-muted">
+          <span class="mod-icon">📋</span>
+          <div class="mod-name">네이버 금융</div>
+          <div class="mod-desc">종목 분석<br>PDF 리포트</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="arrow-down"></div></div>
+
+    <!-- ② 수집 레이어 -->
+    <div class="layer" id="l1">
+      <div class="layer-label lbl-collect">② 수집 레이어 — kstock_signal/collectors/</div>
+      <div class="layer-row">
+        <div class="mod c-rust">
+          <span class="mod-icon">💹</span>
+          <div class="mod-name">MarketCollector</div>
+          <div class="mod-desc">시장 데이터 수집</div>
+          <div class="mod-tags">
+            <span class="mtag mt-muted">collectors/market.py</span>
+          </div>
+        </div>
+        <div class="mod c-rust">
+          <span class="mod-icon">🎬</span>
+          <div class="mod-name">YouTubeCollector</div>
+          <div class="mod-desc">영상 + 자막 수집</div>
+          <div class="mod-tags">
+            <span class="mtag mt-muted">collectors/youtube.py</span>
+          </div>
+        </div>
+        <div class="mod c-rust">
+          <span class="mod-icon">📡</span>
+          <div class="mod-name">NewsCollector</div>
+          <div class="mod-desc">RSS 뉴스 수집</div>
+          <div class="mod-tags">
+            <span class="mtag mt-muted">collectors/news.py</span>
+          </div>
+        </div>
+        <div class="mod c-rust">
+          <span class="mod-icon">📄</span>
+          <div class="mod-name">NaverReport<br>Collector</div>
+          <div class="mod-desc">PDF 리포트 수집</div>
+          <div class="mod-tags">
+            <span class="mtag mt-muted">collectors/naver_report.py</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="arrow-down"></div></div>
+
+    <!-- ③ 오케스트레이터 -->
+    <div class="layer" id="l2">
+      <div class="layer-label lbl-analyze">③ 오케스트레이터</div>
+      <div class="layer-row">
+        <div class="mod c-sepia wide">
+          <span class="mod-icon">⚙️</span>
+          <div class="mod-name">SignalScheduler</div>
+          <div class="mod-desc">전체 파이프라인 조율 · 매일 08:00 KST 자동 실행</div>
+          <div class="mod-tags">
+            <span class="mtag mt-muted">kstock_signal/scheduler.py</span>
+            <span class="mtag mt-sepia">run() → collect → analyze → save → send</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="arrow-down"></div></div>
+
+    <!-- ④ 분석 레이어 -->
+    <div class="layer" id="l3">
+      <div class="layer-label lbl-analyze">④ 분석 레이어 — kstock_signal/analyzers/</div>
+      <div class="layer-row">
+        <div class="mod c-sepia">
+          <span class="mod-icon">🧠</span>
+          <div class="mod-name">TrendAnalyzer</div>
+          <div class="mod-desc">시장 트렌드<br>AI 분석</div>
+          <div class="mod-tags">
+            <span class="mtag mt-sepia">DeepSeek</span>
+            <span class="mtag mt-sepia">Groq</span>
+            <span class="mtag mt-sepia">Gemini</span>
+            <span class="mtag mt-sepia">Claude</span>
+          </div>
+        </div>
+        <div class="mod c-sepia">
+          <span class="mod-icon">📝</span>
+          <div class="mod-name">ScriptGenerator</div>
+          <div class="mod-desc">숏폼 스크립트<br>5포맷 생성</div>
+          <div class="mod-tags">
+            <span class="mtag mt-muted">analyzers/script.py</span>
+          </div>
+        </div>
+        <div class="mod c-sepia">
+          <span class="mod-icon">🎭</span>
+          <div class="mod-name">CelebCaster</div>
+          <div class="mod-desc">CEO 캐릭터<br>12개 기업 DB</div>
+          <div class="mod-tags">
+            <span class="mtag mt-muted">analyzers/celeb_cast.py</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="arrow-down"></div></div>
+
+    <!-- ⑤ 저장 레이어 -->
+    <div class="layer" id="l4">
+      <div class="layer-label lbl-store">⑤ 저장 레이어</div>
+      <div class="layer-row">
+        <div class="mod c-olive wide">
+          <span class="mod-icon">💾</span>
+          <div class="mod-name">SupabaseDB</div>
+          <div class="mod-desc">PostgreSQL 클라우드 DB — 모든 데이터 영구 보관</div>
+          <div class="mod-tags">
+            <span class="mtag mt-olive">market_data</span>
+            <span class="mtag mt-olive">youtube_videos</span>
+            <span class="mtag mt-olive">news_articles</span>
+            <span class="mtag mt-olive">reports</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="arrow-down"></div></div>
+
+    <!-- ⑥ 출력 레이어 -->
+    <div class="layer" id="l5">
+      <div class="layer-label lbl-output">⑥ 출력 레이어</div>
+      <div class="layer-row">
+        <div class="mod c-amber">
+          <span class="mod-icon">📲</span>
+          <div class="mod-name">TelegramReporter</div>
+          <div class="mod-desc">시장 신호<br>메시지 발송</div>
+          <div class="mod-tags">
+            <span class="mtag mt-muted">reporters/telegram.py</span>
+          </div>
+        </div>
+        <div class="mod c-amber">
+          <span class="mod-icon">🎞️</span>
+          <div class="mod-name">VideoGenerator</div>
+          <div class="mod-desc">PIL·moviepy<br>6포맷 렌더</div>
+          <div class="mod-tags">
+            <span class="mtag mt-muted">generators/video.py</span>
+          </div>
+        </div>
+        <div class="mod c-amber">
+          <span class="mod-icon">🤖</span>
+          <div class="mod-name">HeyGenClient</div>
+          <div class="mod-desc">AI 아바타<br>영상 생성</div>
+          <div class="mod-tags">
+            <span class="mtag mt-muted">generators/heygen.py</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="arrow-down"></div></div>
+
+    <!-- ⑦ 사용자 인터페이스 -->
+    <div class="layer" id="l6">
+      <div class="layer-label lbl-user">⑦ 사용자 인터페이스 — telegram_bot/</div>
+      <div class="layer-row">
+        <div class="mod c-green">
+          <span class="mod-icon">💬</span>
+          <div class="mod-name">ChatHandler</div>
+          <div class="mod-desc">Claude AI<br>자유 대화</div>
+          <div class="mod-tags">
+            <span class="mtag mt-muted">handlers/chat.py</span>
+          </div>
+        </div>
+        <div class="mod c-green">
+          <span class="mod-icon">📊</span>
+          <div class="mod-name">SignalHandler</div>
+          <div class="mod-desc">/monitor<br>/report</div>
+          <div class="mod-tags">
+            <span class="mtag mt-muted">handlers/signal.py</span>
+          </div>
+        </div>
+        <div class="mod c-green">
+          <span class="mod-icon">⚙️</span>
+          <div class="mod-name">SettingsHandler</div>
+          <div class="mod-desc">/style /api<br>/status</div>
+          <div class="mod-tags">
+            <span class="mtag mt-muted">handlers/settings.py</span>
+          </div>
+        </div>
+        <div class="mod c-green">
+          <span class="mod-icon">🧑</span>
+          <div class="mod-name">사용자</div>
+          <div class="mod-desc">텔레그램<br>메시지 수신</div>
+          <div class="mod-tags">
+            <span class="mtag mt-green">Telegram</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /arch -->
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item"><span class="legend-dot" style="background:var(--muted)"></span>외부 API / 데이터 소스</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--rust)"></span>수집 모듈 (Collectors)</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--sepia)"></span>분석 / 오케스트레이터</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--olive)"></span>데이터 저장 (Supabase)</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--amber)"></span>출력 (발송 / 영상)</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>사용자 인터페이스 (텔레그램 봇)</div>
+  </div>
+
+  <!-- Data Flow -->
+  <div class="flow-section" id="flow">
+    <div class="flow-title">DATA FLOW — 실행 순서</div>
+    <div class="flow-steps">
+      <div class="flow-step">
+        <div class="flow-icon fi-rust">🌐</div>
+        <div class="flow-name">수집</div>
+        <div class="flow-sub">Market · YouTube<br>News · PDF</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="flow-icon fi-sepia">🧠</div>
+        <div class="flow-name">분석</div>
+        <div class="flow-sub">AI 트렌드<br>인사이트</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="flow-icon fi-olive">💾</div>
+        <div class="flow-name">저장</div>
+        <div class="flow-sub">Supabase<br>4개 테이블</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="flow-icon fi-amber">📲</div>
+        <div class="flow-name">발송</div>
+        <div class="flow-sub">텔레그램<br>신호 전송</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="flow-icon fi-green">🧑</div>
+        <div class="flow-name">사용자</div>
+        <div class="flow-sub">리포트 확인<br>AI 질의</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<!-- Shared sidebar -->
+<div class="shared-bar">
+  <div class="shared-pill">
+    <span class="spl-icon">🔧</span>
+    <div class="spl-name">CONFIG</div>
+    <div class="spl-desc">shared/<br>config.py</div>
+  </div>
+  <div class="shared-pill">
+    <span class="spl-icon">🗄️</span>
+    <div class="spl-name">DB Client</div>
+    <div class="spl-desc">database/<br>client.py</div>
+  </div>
+  <div class="shared-pill">
+    <span class="spl-icon">📁</span>
+    <div class="spl-name">Cache</div>
+    <div class="spl-desc">/tmp/<br>latest_report</div>
+  </div>
+</div>
+
+<script>
+// ── Warm particle canvas ──────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+resize();
+window.addEventListener('resize', resize);
+
+const COLS = [
+  [140,  58,  24], // rust
+  [122,  82,  32], // sepia
+  [ 74,  94,  48], // olive
+  [176, 124,  24], // amber
+];
+
+const pts = Array.from({length: 55}, () => ({
+  x:  Math.random() * window.innerWidth,
+  y:  Math.random() * window.innerHeight,
+  vx: (Math.random() - 0.5) * 0.4,
+  vy: (Math.random() - 0.5) * 0.4,
+  c:  COLS[Math.floor(Math.random() * COLS.length)],
+  r:  Math.random() * 2 + 1,
+}));
+
+function draw(t) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    p.x += p.vx; p.y += p.vy;
+    if (p.x < 0 || p.x > canvas.width)  p.vx *= -1;
+    if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+    for (let j = i + 1; j < pts.length; j++) {
+      const q = pts[j];
+      const d = Math.hypot(p.x - q.x, p.y - q.y);
+      if (d < 130) {
+        const a = (1 - d / 130) * 0.20;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(q.x, q.y);
+        ctx.strokeStyle = `rgba(${p.c[0]},${p.c[1]},${p.c[2]},${a})`;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+      }
+    }
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${p.c[0]},${p.c[1]},${p.c[2]},0.65)`;
+    ctx.fill();
+  }
+  requestAnimationFrame(draw);
+}
+draw();
+
+// ── Scroll entrance animation ─────────────────────────────────────
+const animItems = document.querySelectorAll('.layer, .connector');
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      setTimeout(() => e.target.classList.add('anim-ready'), 0);
+      obs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.1 });
+
+animItems.forEach(el => obs.observe(el));
+
+document.querySelectorAll('.layer').forEach((el, i) => {
+  const rect = el.getBoundingClientRect();
+  if (rect.top < window.innerHeight) {
+    setTimeout(() => el.classList.add('anim-ready'), i * 80);
+  }
+});
+document.querySelectorAll('.connector').forEach((el, i) => {
+  const rect = el.getBoundingClientRect();
+  if (rect.top < window.innerHeight) {
+    setTimeout(() => el.classList.add('anim-ready'), i * 60);
+  }
+});
+</script>
+</body>
+</html>

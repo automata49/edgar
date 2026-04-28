@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edgar AI — Things in Motion</title>
+  <link rel="canonical" href="https://edgar-ai.com/">
+  <meta name="description" content="투자·물류·음악·라이프 — 움직이는 모든 것을 위한 AI 인텔리전스.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://edgar-ai.com/">
+  <meta property="og:title" content="edgar AI — Things in Motion">
+  <meta property="og:description" content="투자·물류·음악·라이프 — 움직이는 모든 것을 위한 AI 인텔리전스.">
+  <meta property="og:image" content="https://edgar-ai.com/bg.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://edgar-ai.com/">
+  <meta name="twitter:title" content="edgar AI — Things in Motion">
+  <meta name="twitter:description" content="투자·물류·음악·라이프 — 움직이는 모든 것을 위한 AI 인텔리전스.">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --paper:  #f5edd6;
+      --paper2: #ece3c4;
+      --rust:   #8c3a18;
+      --sepia:  #7a5220;
+      --olive:  #4a5e30;
+      --amber:  #b07c18;
+      --ink:    #271508;
+      --muted:  #7b5535;
+      --glass:  rgba(245,237,214,0.93);
+      --border: rgba(140,58,24,0.20);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background-color: var(--paper);
+      /* subtle paper grain via SVG filter */
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.78' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+      font-family: 'American Typewriter', 'Courier Prime', 'Courier New', Georgia, serif;
+      color: var(--ink);
+      overflow-x: hidden;
+    }
+
+    /* ── Canvas ── */
+    #c {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.28;
+    }
+
+    .page { position: relative; z-index: 1; }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2.5rem;
+      background: rgba(245,237,214,0.90);
+      backdrop-filter: blur(24px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      font-size: 1.35rem;
+      font-weight: 400;
+      letter-spacing: 0.12em;
+      background: linear-gradient(120deg, var(--rust), var(--sepia));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .nav-logo em {
+      background: linear-gradient(120deg, var(--olive), var(--rust));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-style: normal;
+    }
+
+    .nav-links { display: flex; gap: 2rem; list-style: none; }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      letter-spacing: 0.04em;
+      transition: color 0.25s;
+    }
+    .nav-links a:hover { color: var(--rust); }
+
+    .nav-badge {
+      font-size: 0.72rem;
+      padding: 0.3rem 0.9rem;
+      border: 1px solid rgba(74,94,48,0.4);
+      border-radius: 20px;
+      color: var(--olive);
+      letter-spacing: 0.12em;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 4rem 2rem 6rem;
+      position: relative;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      padding: 0.38rem 1.1rem;
+      border: 1px solid rgba(74,94,48,0.40);
+      border-radius: 20px;
+      font-size: 0.72rem;
+      color: var(--olive);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 2rem;
+      background: rgba(74,94,48,0.06);
+    }
+
+    /* bg.jpg 사용 — 타이틀 카드 배경만 */
+    .title-card {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      padding: 3rem 4.5rem;
+      margin-bottom: 1.4rem;
+      border: 2px solid rgba(140,58,24,0.38);
+      box-shadow: 0 6px 48px rgba(42,21,8,0.28), inset 0 0 60px rgba(0,0,0,0.15);
+    }
+    .title-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: url('./bg.jpg') center / cover no-repeat;
+      filter: sepia(0.60) brightness(0.30) contrast(1.18);
+      z-index: 0;
+    }
+    .title-card > * { position: relative; z-index: 1; }
+
+    .hero-title {
+      font-size: clamp(3.5rem, 10vw, 7.5rem);
+      font-weight: 400;
+      letter-spacing: 0.04em;
+      line-height: 0.95;
+      margin-bottom: 0.5rem;
+      color: #f5edd6;
+      background: none;
+      -webkit-text-fill-color: #f5edd6;
+      text-shadow: 0 2px 32px rgba(0,0,0,0.55), 0 0 80px rgba(210,160,70,0.30);
+    }
+
+    .title-sub {
+      font-size: clamp(1rem, 2.4vw, 1.3rem);
+      color: rgba(245,237,214,0.68);
+      letter-spacing: 0.06em;
+    }
+
+    .hero-sub {
+      font-size: clamp(1.1rem, 2.8vw, 1.5rem);
+      color: var(--muted);
+      margin-bottom: 1.2rem;
+      letter-spacing: 0.02em;
+    }
+
+    .hero-desc {
+      max-width: 560px;
+      font-size: 1rem;
+      color: rgba(123,85,53,0.75);
+      line-height: 1.8;
+      margin: 0 auto 2.8rem;
+    }
+
+    .cta-row { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-bottom: 3.5rem; }
+
+    .btn {
+      padding: 0.85rem 2.2rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn-glow {
+      background: linear-gradient(135deg, var(--rust), var(--sepia));
+      color: #f5edd6;
+      border: none;
+      box-shadow: 0 0 28px rgba(140,58,24,0.35);
+    }
+    .btn-glow:hover { transform: translateY(-2px); box-shadow: 0 0 48px rgba(140,58,24,0.55); }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .btn-ghost:hover { border-color: var(--rust); color: var(--rust); }
+
+    /* ── Terminal ── */
+    .terminal {
+      background: rgba(39,18,6,0.94);
+      border: 1px solid rgba(140,58,24,0.38);
+      border-radius: 14px;
+      width: 100%;
+      max-width: 560px;
+      padding: 1.4rem 1.6rem;
+      text-align: left;
+      box-shadow: 0 0 60px rgba(140,58,24,0.12), inset 0 1px 0 rgba(200,150,80,0.14);
+      margin-bottom: 4rem;
+    }
+    .term-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.8rem;
+      border-bottom: 1px solid rgba(140,58,24,0.25);
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-r { background: #ff5f56; }
+    .dot-y { background: #ffbd2e; }
+    .dot-g { background: #27c93f; }
+    .term-title { font-size: 0.75rem; color: rgba(210,170,110,0.55); margin-left: auto; letter-spacing: 0.08em; }
+    #term-out {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.82rem;
+      line-height: 1.9;
+      color: #d4c0a0;
+      min-height: 180px;
+    }
+    #term-out .ok     { color: #7ab870; }
+    #term-out .cmd    { color: #d4905a; }
+    #term-out .warn   { color: #c8a030; }
+    #term-out .sep    { color: rgba(200,150,80,0.30); }
+    #term-out .active { color: #7ab870; }
+    .cursor {
+      display: inline-block;
+      width: 8px;
+      height: 14px;
+      background: #d4905a;
+      vertical-align: text-bottom;
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ── Stats ── */
+    .stats {
+      display: flex;
+      gap: 3rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .stat { text-align: center; }
+    .stat-num {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: var(--rust);
+      display: block;
+    }
+    .stat-lbl {
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      margin-top: 0.25rem;
+    }
+
+    /* ── Section base ── */
+    section { padding: 6rem 2rem; }
+    .sec-hd { text-align: center; margin-bottom: 3.5rem; }
+    .sec-tag {
+      font-size: 0.72rem;
+      letter-spacing: 0.22em;
+      color: var(--olive);
+      text-transform: uppercase;
+      margin-bottom: 0.7rem;
+    }
+    .sec-title {
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 700;
+      margin-bottom: 0.9rem;
+      color: var(--ink);
+    }
+    .sec-desc { color: var(--muted); max-width: 560px; margin: 0 auto; line-height: 1.7; }
+
+    /* ── Features ── */
+    #features { background: rgba(236,227,196,0.55); }
+    .feat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.4rem;
+      max-width: 1160px;
+      margin: 0 auto;
+    }
+    .feat-card {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s, transform 0.3s;
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    .feat-card.visible { opacity: 1; transform: translateY(0); transition: opacity 0.5s ease, transform 0.5s ease, border-color 0.3s, box-shadow 0.3s; }
+    .feat-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--rust), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .feat-card:hover { border-color: rgba(140,58,24,0.40); transform: translateY(-4px); box-shadow: 0 8px 40px rgba(140,58,24,0.10); }
+    .feat-card:hover::after { opacity: 1; }
+
+    .feat-icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+      margin-bottom: 1.2rem;
+    }
+    .ic-blue   { background: rgba(140,58,24,0.10); }
+    .ic-purple { background: rgba(122,82,32,0.10); }
+    .ic-teal   { background: rgba(74,94,48,0.10);  }
+    .ic-orange { background: rgba(176,124,24,0.10); }
+    .ic-green  { background: rgba(74,94,48,0.10);  }
+    .ic-pink   { background: rgba(160,82,45,0.10); }
+
+    .feat-title { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.6rem; color: var(--ink); }
+    .feat-desc { color: var(--muted); font-size: 0.88rem; line-height: 1.65; }
+    .feat-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1rem; }
+    .tag {
+      font-size: 0.7rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 6px;
+      border: 1px solid;
+      letter-spacing: 0.06em;
+    }
+    .tag-blue   { color: var(--rust);  border-color: rgba(140,58,24,0.30);  background: rgba(140,58,24,0.06); }
+    .tag-purple { color: var(--sepia); border-color: rgba(122,82,32,0.30);  background: rgba(122,82,32,0.06); }
+    .tag-teal   { color: var(--olive); border-color: rgba(74,94,48,0.30);   background: rgba(74,94,48,0.06);  }
+    .tag-orange { color: var(--amber); border-color: rgba(176,124,24,0.30); background: rgba(176,124,24,0.06); }
+
+    /* ── Pipeline ── */
+    #pipeline { background: rgba(245,237,214,0.75); }
+    .pipe-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      flex-wrap: wrap;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .pipe-step {
+      text-align: center;
+      padding: 1rem 1.5rem;
+      min-width: 160px;
+      opacity: 0;
+      transform: scale(0.85);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .pipe-step.visible { opacity: 1; transform: scale(1); }
+
+    .pipe-icon {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      border: 2px solid;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem;
+      margin: 0 auto 1rem;
+      position: relative;
+      transition: box-shadow 0.3s;
+    }
+    .pipe-icon:hover { box-shadow: 0 0 30px currentColor !important; }
+    .pi-blue   { border-color: var(--rust);  background: rgba(140,58,24,0.07);  color: var(--rust);  box-shadow: 0 0 18px rgba(140,58,24,0.22); }
+    .pi-purple { border-color: var(--sepia); background: rgba(122,82,32,0.07);  color: var(--sepia); box-shadow: 0 0 18px rgba(122,82,32,0.22); }
+    .pi-teal   { border-color: var(--olive); background: rgba(74,94,48,0.07);   color: var(--olive); box-shadow: 0 0 18px rgba(74,94,48,0.22);  }
+    .pi-orange { border-color: var(--amber); background: rgba(176,124,24,0.07); color: var(--amber); box-shadow: 0 0 18px rgba(176,124,24,0.22); }
+
+    .pipe-name { font-size: 1rem; font-weight: 600; margin-bottom: 0.3rem; color: var(--ink); }
+    .pipe-desc { font-size: 0.8rem; color: var(--muted); }
+
+    .pipe-arrow {
+      font-size: 1.6rem;
+      color: rgba(140,58,24,0.28);
+      flex-shrink: 0;
+      padding: 0 0.2rem;
+    }
+
+    /* ── Signal sample ── */
+    #signals { background: rgba(236,227,196,0.55); }
+    .signal-box {
+      max-width: 680px;
+      margin: 0 auto;
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 0 60px rgba(140,58,24,0.07);
+    }
+    .sig-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .sig-title { font-weight: 700; font-size: 1.05rem; color: var(--ink); }
+    .sig-live {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.75rem; color: #4a7a30; letter-spacing: 0.08em;
+    }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #4a7a30; animation: pulse-dot 1.5s ease-in-out infinite; }
+    @keyframes pulse-dot { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
+
+    .sig-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid rgba(140,58,24,0.08);
+      font-size: 0.88rem;
+    }
+    .sig-row:last-child { border-bottom: none; }
+    .sig-sym { color: var(--rust); font-weight: 600; }
+    .sig-val { color: var(--ink); }
+    .sig-dir { font-weight: 700; }
+    .up { color: #3d6b20; }
+    .dn { color: #8c2010; }
+
+    .sig-analysis {
+      margin-top: 1.2rem;
+      padding: 1rem;
+      background: rgba(140,58,24,0.05);
+      border-radius: 10px;
+      border-left: 3px solid var(--rust);
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 3rem 2rem 2rem;
+      border-top: 1px solid var(--border);
+      background: rgba(236,227,196,0.45);
+    }
+    .foot-logo {
+      font-size: 2rem;
+      font-weight: 400;
+      letter-spacing: 0.05em;
+      background: linear-gradient(120deg, var(--rust), var(--sepia), var(--olive));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.6rem;
+    }
+    .foot-sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 1.5rem; }
+    .foot-links { display: flex; gap: 1.5rem; justify-content: center; margin-bottom: 2rem; }
+    .foot-links a { color: var(--muted); text-decoration: none; font-size: 0.82rem; transition: color 0.2s; }
+    .foot-links a:hover { color: var(--rust); }
+    .foot-copy { font-size: 0.75rem; color: rgba(123,85,53,0.48); }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      .nav-links { display: none; }
+      .nav-badge { display: none; }
+      .pipe-arrow { transform: rotate(90deg); }
+      .pipe-wrap { flex-direction: column; }
+      .title-card { padding: 2rem 1.5rem; }
+    }
+
+    /* ── Scroll fade ── */
+    .fade-in { opacity: 0; transform: translateY(20px); }
+    .fade-in.visible { opacity: 1; transform: translateY(0); transition: opacity 0.6s ease, transform 0.6s ease; }
+  </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <div class="nav-logo">edgar <em>AI</em></div>
+  <ul class="nav-links">
+    <li><a href="#features">기능</a></li>
+    <li><a href="#pipeline">파이프라인</a></li>
+    <li><a href="#signals">신호</a></li>
+  </ul>
+  <span class="nav-badge">LIVE</span>
+</nav>
+
+<!-- Particle Canvas -->
+<canvas id="c"></canvas>
+
+<div class="page">
+
+  <!-- Hero -->
+  <section class="hero" id="home">
+    <div class="hero-badge">THINGS IN MOTION · AI</div>
+
+    <!-- bg.jpg는 이 카드 배경에만 사용 -->
+    <div class="title-card">
+      <h1 class="hero-title">edgar AI</h1>
+      <p class="title-sub">움직이는 모든 것을 읽다</p>
+    </div>
+
+    <p class="hero-desc">
+      투자·물류·음악·라이프 — 세상이 움직이는 곳에 Edgar AI가 있습니다.<br>
+      흐름을 읽고, 신호를 포착하고, 한발 앞서갑니다.
+    </p>
+    <div class="cta-row">
+      <a href="#features" class="btn btn-glow">기능 살펴보기</a>
+      <a href="#signals" class="btn btn-ghost">샘플 신호 보기</a>
+    </div>
+
+    <!-- Terminal -->
+    <div class="terminal">
+      <div class="term-bar">
+        <span class="dot dot-r"></span>
+        <span class="dot dot-y"></span>
+        <span class="dot dot-g"></span>
+        <span class="term-title">edgar ai — bash</span>
+      </div>
+      <div id="term-out"></div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-num" data-target="50">0</span>
+        <span class="stat-lbl">+ 심볼 분석</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num" data-target="4">0</span>
+        <span class="stat-lbl">LLM 프로바이더</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num" data-target="24">0</span>
+        <span class="stat-lbl">/ 7 모니터링</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num" data-target="100">0</span>
+        <span class="stat-lbl">% 자동화</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features">
+    <div class="sec-hd fade-in">
+      <div class="sec-tag">CORE FEATURES</div>
+      <h2 class="sec-title">모든 것이 연결된 인텔리전스</h2>
+      <p class="sec-desc">수집부터 분석, 발송까지 — 시장의 모든 신호를 하나의 파이프라인으로.</p>
+    </div>
+    <div class="feat-grid">
+      <div class="feat-card">
+        <div class="feat-icon ic-blue">📊</div>
+        <div class="feat-title">실시간 시장 데이터</div>
+        <p class="feat-desc">yfinance와 CoinGecko API로 50개 이상의 글로벌 주식·코인 심볼을 실시간 추적합니다.</p>
+        <div class="feat-tags">
+          <span class="tag tag-blue">yfinance</span>
+          <span class="tag tag-blue">CoinGecko</span>
+          <span class="tag tag-teal">50+ 심볼</span>
+        </div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon ic-purple">🧠</div>
+        <div class="feat-title">멀티 LLM 트렌드 분석</div>
+        <p class="feat-desc">DeepSeek, Groq, Gemini, Claude — 4개의 LLM 엔진을 선택하여 시장 흐름을 분석합니다.</p>
+        <div class="feat-tags">
+          <span class="tag tag-purple">DeepSeek</span>
+          <span class="tag tag-purple">Groq</span>
+          <span class="tag tag-purple">Gemini</span>
+          <span class="tag tag-purple">Claude</span>
+        </div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon ic-teal">📡</div>
+        <div class="feat-title">멀티소스 뉴스 수집</div>
+        <p class="feat-desc">YouTube Data API 자막, RSS 피드, 네이버 금융 PDF 리포트를 자동으로 수집합니다.</p>
+        <div class="feat-tags">
+          <span class="tag tag-teal">YouTube</span>
+          <span class="tag tag-teal">RSS</span>
+          <span class="tag tag-teal">네이버 리포트</span>
+        </div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon ic-orange">📱</div>
+        <div class="feat-title">텔레그램 봇 알림</div>
+        <p class="feat-desc">/monitor, /report 명령어로 즉시 실행하거나 매일 오전 8시 자동 신호를 수신합니다.</p>
+        <div class="feat-tags">
+          <span class="tag tag-orange">/monitor</span>
+          <span class="tag tag-orange">/report</span>
+          <span class="tag tag-orange">08:00 KST</span>
+        </div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon ic-green">💾</div>
+        <div class="feat-title">클라우드 데이터베이스</div>
+        <p class="feat-desc">모든 시장 데이터, 뉴스, 영상 정보를 Supabase PostgreSQL에 영구 보관합니다.</p>
+        <div class="feat-tags">
+          <span class="tag tag-teal">Supabase</span>
+          <span class="tag tag-teal">PostgreSQL</span>
+          <span class="tag tag-teal">4개 테이블</span>
+        </div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon ic-pink">🎬</div>
+        <div class="feat-title">AI 숏폼 콘텐츠 생성</div>
+        <p class="feat-desc">시장 분석을 기반으로 스크립트를 생성하고 HeyGen AI 아바타로 영상을 자동 제작합니다.</p>
+        <div class="feat-tags">
+          <span class="tag tag-purple">HeyGen</span>
+          <span class="tag tag-purple">ScriptGen</span>
+          <span class="tag tag-purple">6 포맷</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pipeline -->
+  <section id="pipeline">
+    <div class="sec-hd fade-in">
+      <div class="sec-tag">DATA PIPELINE</div>
+      <h2 class="sec-title">데이터가 흐르는 방식</h2>
+      <p class="sec-desc">수집 → 분석 → 저장 → 발송. 단계별로 자동화된 완전한 파이프라인.</p>
+    </div>
+    <div class="pipe-wrap">
+      <div class="pipe-step">
+        <div class="pipe-icon pi-blue">🌐</div>
+        <div class="pipe-name">수집</div>
+        <div class="pipe-desc">시장 + 뉴스 + 영상</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="pipe-icon pi-purple">🧠</div>
+        <div class="pipe-name">분석</div>
+        <div class="pipe-desc">AI 트렌드 인사이트</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="pipe-icon pi-teal">💾</div>
+        <div class="pipe-name">저장</div>
+        <div class="pipe-desc">Supabase DB</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="pipe-icon pi-orange">📲</div>
+        <div class="pipe-name">발송</div>
+        <div class="pipe-desc">텔레그램 신호</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sample Signal -->
+  <section id="signals">
+    <div class="sec-hd fade-in">
+      <div class="sec-tag">SIGNAL OUTPUT</div>
+      <h2 class="sec-title">오늘의 시장 신호</h2>
+      <p class="sec-desc">Edgar AI가 분석한 실시간 시장 데이터와 트렌드 인사이트.</p>
+    </div>
+    <div class="signal-box fade-in">
+      <div class="sig-header">
+        <span class="sig-title">📊 Daily Market Signal</span>
+        <span class="sig-live"><span class="live-dot"></span>LIVE</span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-sym">SAMSUNG (005930)</span>
+        <span class="sig-val">₩78,200</span>
+        <span class="sig-dir up">▲ +1.24%</span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-sym">KOSPI</span>
+        <span class="sig-val">2,842.05</span>
+        <span class="sig-dir up">▲ +0.83%</span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-sym">BTC-USD</span>
+        <span class="sig-val">$68,420</span>
+        <span class="sig-dir dn">▼ -0.51%</span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-sym">ETH-USD</span>
+        <span class="sig-val">$3,240</span>
+        <span class="sig-dir up">▲ +2.08%</span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-sym">NVIDIA (NVDA)</span>
+        <span class="sig-val">$875.40</span>
+        <span class="sig-dir up">▲ +3.21%</span>
+      </div>
+      <div class="sig-analysis">
+        🤖 <strong>AI 분석:</strong> 반도체 섹터 강세 지속. NVDA 실적 기대감으로 기술주 전반 상승 압력.
+        국내 삼성전자 HBM 수혜 기대감 유효. BTC는 단기 조정 후 $70K 저항선 재도전 예상.
+        전반적 위험선호 심리 우세 — <strong style="color:var(--olive)">BULLISH</strong>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="foot-logo">edgar AI</div>
+    <p class="foot-sub">Things in Motion — 움직이는 것들을 위한 AI</p>
+    <div class="foot-links">
+      <a href="#home">홈</a>
+      <a href="#features">기능</a>
+      <a href="#pipeline">파이프라인</a>
+      <a href="#signals">신호</a>
+    </div>
+    <p class="foot-copy">© 2026 Edgar AI · <a href="https://edgar-ai.com" style="color:inherit;text-decoration:none;">edgar-ai.com</a></p>
+  </footer>
+
+</div><!-- /page -->
+
+<script>
+// ═══════════════════════════════════════════════
+//  WARM PARTICLE CANVAS
+// ═══════════════════════════════════════════════
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const mouse = { x: -2000, y: -2000 };
+let mouseActive = false;
+document.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; mouseActive = true; });
+document.addEventListener('mouseleave', () => { mouseActive = false; });
+
+const ripples = [];
+document.addEventListener('click', e => {
+  ripples.push({ x: e.clientX, y: e.clientY, r: 0, life: 1 });
+});
+
+// ── Stars ──────────────────────────────────────
+class Star {
+  constructor() { this.init(); }
+  init() {
+    this.x  = Math.random() * canvas.width;
+    this.y  = Math.random() * canvas.height;
+    this.r  = Math.random() * 1.2 + 0.2;
+    this.a  = Math.random() * 0.25 + 0.08;
+    this.ts = Math.random() * 0.015 + 0.003;
+    this.to = Math.random() * Math.PI * 2;
+    this.vx = (Math.random() - 0.5) * 0.04;
+    this.vy = (Math.random() - 0.5) * 0.04;
+  }
+  update() {
+    this.x += this.vx; this.y += this.vy;
+    if (this.x < -4 || this.x > canvas.width + 4 || this.y < -4 || this.y > canvas.height + 4) this.init();
+  }
+  draw(t) {
+    const a = this.a * (0.65 + 0.35 * Math.sin(t * this.ts + this.to));
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(140,80,30,${a})`;
+    ctx.fill();
+  }
+}
+
+// ── Neurons ────────────────────────────────────
+const COLORS = [
+  [140,  58,  24], // rust
+  [122,  82,  32], // sepia
+  [ 74,  94,  48], // olive
+  [176, 124,  24], // amber (rare)
+];
+
+class Neuron {
+  constructor() { this.init(); }
+  init() {
+    this.x  = Math.random() * canvas.width;
+    this.y  = Math.random() * canvas.height;
+    this.vx = (Math.random() - 0.5) * 0.6;
+    this.vy = (Math.random() - 0.5) * 0.6;
+    this.r  = Math.random() * 2.5 + 1.5;
+    const wi = Math.random() < 0.08 ? 3 : Math.floor(Math.random() * 3);
+    this.col = COLORS[wi];
+    this.ps = Math.random() * 0.025 + 0.008;
+    this.po = Math.random() * Math.PI * 2;
+  }
+  update(t) {
+    const dx = mouse.x - this.x, dy = mouse.y - this.y;
+    const d  = Math.hypot(dx, dy);
+    if (d < 220 && mouseActive) {
+      const f = (220 - d) / 220 * 0.25;
+      this.vx += dx / d * f;
+      this.vy += dy / d * f;
+    }
+    this.vx *= 0.97; this.vy *= 0.97;
+    const spd = Math.hypot(this.vx, this.vy);
+    if (spd > 2.2) { this.vx = this.vx / spd * 2.2; this.vy = this.vy / spd * 2.2; }
+    this.x += this.vx; this.y += this.vy;
+    if (this.x < 0) { this.x = 0; this.vx *= -1; }
+    if (this.x > canvas.width)  { this.x = canvas.width;  this.vx *= -1; }
+    if (this.y < 0) { this.y = 0; this.vy *= -1; }
+    if (this.y > canvas.height) { this.y = canvas.height; this.vy *= -1; }
+  }
+  draw(t) {
+    const [r,g,b] = this.col;
+    const p = 0.72 + 0.28 * Math.sin(t * this.ps + this.po);
+    const sz = this.r * p;
+    ctx.shadowBlur = 12 * p;
+    ctx.shadowColor = `rgb(${r},${g},${b})`;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, sz, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${r},${g},${b},0.80)`;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, sz * 2.8, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(${r},${g},${b},0.10)`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+}
+
+// ── Pulses ─────────────────────────────────────
+class Pulse {
+  constructor(a, b) {
+    this.a = a; this.b = b;
+    this.t = 0;
+    this.spd = Math.random() * 0.012 + 0.006;
+    this.r = Math.random() * 2 + 1;
+  }
+  update() { this.t += this.spd; return this.t < 1; }
+  draw() {
+    const x = this.a.x + (this.b.x - this.a.x) * this.t;
+    const y = this.a.y + (this.b.y - this.a.y) * this.t;
+    const [r,g,b] = this.a.col;
+    ctx.shadowBlur = 16;
+    ctx.shadowColor = `rgb(${r},${g},${b})`;
+    ctx.beginPath();
+    ctx.arc(x, y, this.r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(245,220,180,0.90)';
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+}
+
+// ── Init ───────────────────────────────────────
+const N_STARS   = 180;
+const N_NEURONS = window.innerWidth < 700 ? 38 : 70;
+const CONN_DIST = 148;
+const MAX_PULSE = 45;
+
+const stars   = Array.from({length: N_STARS},   () => new Star());
+const neurons = Array.from({length: N_NEURONS}, () => new Neuron());
+const pulses  = [];
+let lastPulse = 0;
+
+// ── Draw connections ───────────────────────────
+function drawConnections(t) {
+  for (let i = 0; i < neurons.length; i++) {
+    for (let j = i + 1; j < neurons.length; j++) {
+      const a = neurons[i], b = neurons[j];
+      const dx = a.x - b.x, dy = a.y - b.y;
+      const d = Math.hypot(dx, dy);
+      if (d < CONN_DIST) {
+        const alpha = (1 - d / CONN_DIST) * 0.28;
+        const [r1,g1,b1] = a.col;
+        const [r2,g2,b2] = b.col;
+        const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+        g.addColorStop(0, `rgba(${r1},${g1},${b1},${alpha})`);
+        g.addColorStop(1, `rgba(${r2},${g2},${b2},${alpha})`);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.strokeStyle = g;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+        if (t - lastPulse > 120 && pulses.length < MAX_PULSE && Math.random() < 0.004) {
+          pulses.push(Math.random() > 0.5 ? new Pulse(a, b) : new Pulse(b, a));
+          lastPulse = t;
+        }
+      }
+    }
+  }
+}
+
+// ── Mouse aura ─────────────────────────────────
+function drawMouseFx() {
+  if (!mouseActive) return;
+  neurons.forEach(n => {
+    const dx = mouse.x - n.x, dy = mouse.y - n.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 210) {
+      const [r,g,b] = n.col;
+      const a = (1 - d / 210) * 0.40;
+      ctx.beginPath();
+      ctx.moveTo(n.x, n.y);
+      ctx.lineTo(mouse.x, mouse.y);
+      ctx.strokeStyle = `rgba(${r},${g},${b},${a})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  });
+  const mg = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 90);
+  mg.addColorStop(0, 'rgba(140,58,24,0.10)');
+  mg.addColorStop(1, 'transparent');
+  ctx.beginPath();
+  ctx.arc(mouse.x, mouse.y, 90, 0, Math.PI * 2);
+  ctx.fillStyle = mg;
+  ctx.fill();
+}
+
+// ── Animate ─────────────────────────────────────
+function animate(t = 0) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  stars.forEach(s => { s.update(); s.draw(t); });
+  drawConnections(t);
+  neurons.forEach(n => n.update(t));
+  drawMouseFx();
+  neurons.forEach(n => n.draw(t));
+
+  for (let i = pulses.length - 1; i >= 0; i--) {
+    if (!pulses[i].update()) pulses.splice(i, 1);
+    else pulses[i].draw();
+  }
+
+  for (let i = ripples.length - 1; i >= 0; i--) {
+    const rp = ripples[i];
+    rp.r += 3.5; rp.life -= 0.022;
+    if (rp.life <= 0) { ripples.splice(i, 1); continue; }
+    ctx.beginPath();
+    ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(140,58,24,${rp.life * 0.5})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  requestAnimationFrame(animate);
+}
+animate();
+
+
+// ═══════════════════════════════════════════════
+//  TERMINAL TYPING
+// ═══════════════════════════════════════════════
+const TERM_LINES = [
+  {t:'cmd',   s:'$ edgar init --production'},
+  {t:'ok',    s:'✓ MarketCollector loaded: 50 symbols'},
+  {t:'ok',    s:'✓ NewsCollector: RSS + YouTube active'},
+  {t:'ok',    s:'✓ TrendAnalyzer: DeepSeek connected'},
+  {t:'ok',    s:'✓ TelegramBot: @EdgarSignalBot online'},
+  {t:'ok',    s:'✓ Scheduler: 08:00 KST configured'},
+  {t:'sep',   s:'──────────────────────────────────'},
+  {t:'active',s:'● System ready. Monitoring markets...'},
+];
+
+let tLine = 0, tChar = 0;
+const termEl = document.getElementById('term-out');
+
+function renderTerm() {
+  const done = TERM_LINES.slice(0, tLine).map(l => `<div><span class="${l.t}">${l.s}</span></div>`).join('');
+  const curr = tLine < TERM_LINES.length
+    ? `<div><span class="${TERM_LINES[tLine].t}">${TERM_LINES[tLine].s.slice(0, tChar)}</span><span class="cursor"></span></div>`
+    : '';
+  termEl.innerHTML = done + curr;
+}
+
+function typeStep() {
+  if (tLine >= TERM_LINES.length) return;
+  const line = TERM_LINES[tLine].s;
+  if (tChar < line.length) {
+    tChar++;
+    renderTerm();
+    setTimeout(typeStep, 22 + Math.random() * 18);
+  } else {
+    tLine++; tChar = 0;
+    renderTerm();
+    setTimeout(typeStep, tLine < TERM_LINES.length ? 280 : 0);
+  }
+}
+setTimeout(typeStep, 900);
+
+// ═══════════════════════════════════════════════
+//  COUNTER ANIMATION
+// ═══════════════════════════════════════════════
+function animateCounter(el, target) {
+  let current = 0;
+  const step  = Math.ceil(target / 60);
+  const timer = setInterval(() => {
+    current = Math.min(current + step, target);
+    el.textContent = current;
+    if (current >= target) clearInterval(timer);
+  }, 25);
+}
+
+const counterObs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.querySelectorAll('[data-target]').forEach(el => {
+        animateCounter(el, parseInt(el.dataset.target));
+      });
+      counterObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.4 });
+
+const statsEl = document.querySelector('.stats');
+if (statsEl) counterObs.observe(statsEl);
+
+// ═══════════════════════════════════════════════
+//  SCROLL FADE-IN
+// ═══════════════════════════════════════════════
+const fadeObs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+      fadeObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.12 });
+
+document.querySelectorAll('.fade-in, .feat-card, .pipe-step').forEach(el => fadeObs.observe(el));
+
+document.querySelectorAll('.feat-card').forEach((el, i) => {
+  el.style.transitionDelay = `${i * 80}ms`;
+});
+document.querySelectorAll('.pipe-step').forEach((el, i) => {
+  el.style.transitionDelay = `${i * 120}ms`;
+});
+</script>
+</body>
+</html>

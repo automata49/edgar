@@ -11,6 +11,10 @@ CONFIG = {
     'anthropic_api_key': os.getenv('ANTHROPIC_API_KEY'),
     'telegram_bot_token': os.getenv('TELEGRAM_BOT_TOKEN'),
     'youtube_api_key': os.getenv('YOUTUBE_API_KEY'),
+
+    # ==================== Supabase ====================
+    'supabase_url': os.getenv('SUPABASE_URL'),
+    'supabase_key': os.getenv('SUPABASE_KEY'),
     
     # ==================== LLM 설정 ====================
     'llm_provider': 'deepseek',

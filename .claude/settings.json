@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python*)",
+      "Bash(python3*)",
+      "Bash(pip show*)",
+      "Bash(pip install*)",
+      "Bash(ruff*)",
+      "Bash(find . *)",
+      "Bash(grep*)",
+      "Bash(ls*)",
+      "Bash(cat *)",
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add*)",
+      "Bash(git commit*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_TOOL_INPUT_FILE_PATH:-}\"; [[ \"$f\" == *.py ]] && cd /workspaces/Edgar && python -m ruff check --fix \"$f\" 2>&1 | head -8 || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /workspaces/Edgar && python -c \"from shared.config import CONFIG; from database.client import SupabaseDB; from kstock_signal.scheduler import SignalScheduler; from telegram_bot.main import create_app; print('✅ import check passed')\" 2>&1"
+          }
+        ]
+      }
+    ]
+  }
+}
