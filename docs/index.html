@@ -7,19 +7,19 @@
   <link rel="canonical" href="https://edgar.ai/">
   <meta name="description" content="투자·물류·음악·라이프 — 움직이는 모든 것을 위한 AI 인텔리전스.">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://edgar-ai.com/">
+  <meta property="og:url" content="https://edgar.ai/">
   <meta property="og:title" content="edgar AI — Things in Motion">
-  <meta property="og:image" content="https://edgar-ai.com/bg.jpg">
+  <meta property="og:image" content="https://edgar.ai/bg.jpg">
   <meta name="twitter:card" content="summary_large_image">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg:     #f0f0f0;
-      --lime:   #ccff00;
+      --bg:     #0a0a0a;
+      --accent: #c8c8c8;
       --white:  #f0f0f0;
       --muted:  rgba(240, 240, 240, 0.42);
-      --border: rgba(204, 255, 0, 0.12);
+      --border: rgba(255, 255, 255, 0.08);
       --glass:  rgba(12, 12, 12, 0.80);
     }
 
@@ -62,7 +62,7 @@
       font-family: 'Courier New', 'SF Mono', Courier, monospace;
       font-size: 1rem;
       letter-spacing: 0.18em;
-      color: var(--lime);
+      color: var(--accent);
     }
 
     .nav-links {
@@ -80,14 +80,14 @@
       transition: color 0.2s;
     }
 
-    .nav-links a:hover { color: var(--lime); }
+    .nav-links a:hover { color: var(--accent); }
 
     .nav-status {
       font-size: 0.62rem;
       padding: 0.22rem 0.8rem;
-      border: 1px solid rgba(204, 255, 0, 0.28);
+      border: 1px solid rgba(255, 255, 255, 0.20);
       border-radius: 20px;
-      color: var(--lime);
+      color: var(--accent);
       letter-spacing: 0.18em;
     }
 
@@ -111,7 +111,7 @@
       animation: imgReveal 2.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
       opacity: 0;
       transform: scale(1.6) translateY(30px);
-      border: 1px solid rgba(204, 255, 0, 0.10);
+      border: 1px solid rgba(255, 255, 255, 0.07);
     }
 
     @keyframes imgReveal {
@@ -145,7 +145,7 @@
       font-size: clamp(2.4rem, 6vw, 5rem);
       font-weight: 400;
       letter-spacing: 0.06em;
-      color: var(--lime);
+      color: var(--accent);
       margin-bottom: 0.55rem;
     }
 
@@ -179,20 +179,20 @@
     }
 
     .btn-primary {
-      background: var(--lime);
+      background: var(--accent);
       color: #0a0a0a;
       border: none;
     }
 
-    .btn-primary:hover { background: #d8ff1a; }
+    .btn-primary:hover { background: #ffffff; }
 
     .btn-ghost {
       background: transparent;
-      border: 1px solid rgba(204, 255, 0, 0.28);
+      border: 1px solid rgba(255, 255, 255, 0.20);
       color: var(--muted);
     }
 
-    .btn-ghost:hover { border-color: var(--lime); color: var(--lime); }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
 
     /* ── Section base ── */
     section {
@@ -209,7 +209,7 @@
     .sec-tag {
       font-size: 0.62rem;
       letter-spacing: 0.28em;
-      color: var(--lime);
+      color: var(--accent);
       text-transform: uppercase;
       margin-bottom: 0.7rem;
       opacity: 0.75;
@@ -260,12 +260,12 @@
       transition: opacity 0.5s ease, transform 0.5s ease, background 0.25s;
     }
 
-    .feat-card:hover { background: rgba(204, 255, 0, 0.03); }
+    .feat-card:hover { background: rgba(255, 255, 255, 0.03); }
 
     .feat-num {
       font-family: 'Courier New', monospace;
       font-size: 0.65rem;
-      color: var(--lime);
+      color: var(--accent);
       opacity: 0.45;
       letter-spacing: 0.2em;
       margin-bottom: 1rem;
@@ -295,9 +295,9 @@
     .tag {
       font-size: 0.6rem;
       padding: 0.12rem 0.45rem;
-      border: 1px solid rgba(204, 255, 0, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 2px;
-      color: rgba(204, 255, 0, 0.5);
+      color: rgba(255, 255, 255, 0.38);
       letter-spacing: 0.08em;
       font-family: 'Courier New', monospace;
     }
@@ -329,17 +329,17 @@
       width: 58px;
       height: 58px;
       border-radius: 50%;
-      border: 1px solid rgba(204, 255, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.14);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 1.4rem;
       margin: 0 auto 0.75rem;
-      background: rgba(204, 255, 0, 0.04);
+      background: rgba(255, 255, 255, 0.03);
       transition: box-shadow 0.3s;
     }
 
-    .pipe-icon:hover { box-shadow: 0 0 22px rgba(204, 255, 0, 0.22); }
+    .pipe-icon:hover { box-shadow: 0 0 22px rgba(255, 255, 255, 0.15); }
 
     .pipe-name {
       font-size: 0.85rem;
@@ -355,7 +355,7 @@
 
     .pipe-arrow {
       font-size: 1.1rem;
-      color: rgba(204, 255, 0, 0.22);
+      color: rgba(255, 255, 255, 0.15);
       padding: 0 0.2rem;
       flex-shrink: 0;
     }
@@ -376,7 +376,7 @@
     .stat-num {
       font-family: 'Courier New', monospace;
       font-size: 2.2rem;
-      color: var(--lime);
+      color: var(--accent);
       display: block;
       font-weight: 400;
     }
@@ -411,7 +411,7 @@
     .sig-title {
       font-family: 'Courier New', monospace;
       font-size: 0.75rem;
-      color: var(--lime);
+      color: var(--accent);
       letter-spacing: 0.12em;
     }
 
@@ -420,14 +420,14 @@
       align-items: center;
       gap: 0.4rem;
       font-size: 0.6rem;
-      color: var(--lime);
+      color: var(--accent);
       letter-spacing: 0.14em;
     }
 
     .live-dot {
       width: 6px; height: 6px;
       border-radius: 50%;
-      background: var(--lime);
+      background: var(--accent);
       animation: pulse 1.6s ease infinite;
     }
 
@@ -450,14 +450,14 @@
 
     .sig-sym { color: rgba(240, 240, 240, 0.6); }
     .sig-val { color: var(--white); }
-    .up { color: var(--lime); font-weight: 600; }
+    .up { color: var(--accent); font-weight: 600; }
     .dn { color: #ff4d4d; font-weight: 600; }
 
     .sig-analysis {
       margin-top: 1.2rem;
       padding: 0.9rem 1rem;
-      background: rgba(204, 255, 0, 0.04);
-      border-left: 2px solid rgba(204, 255, 0, 0.30);
+      background: rgba(255, 255, 255, 0.03);
+      border-left: 2px solid rgba(255, 255, 255, 0.18);
       font-size: 0.78rem;
       color: var(--muted);
       line-height: 1.75;
@@ -475,7 +475,7 @@
     .foot-logo {
       font-family: 'Courier New', monospace;
       font-size: 1.3rem;
-      color: var(--lime);
+      color: var(--accent);
       letter-spacing: 0.18em;
       margin-bottom: 0.45rem;
     }
@@ -502,7 +502,7 @@
       transition: color 0.2s;
     }
 
-    .foot-links a:hover { color: var(--lime); }
+    .foot-links a:hover { color: var(--accent); }
 
     .foot-copy {
       font-size: 0.65rem;
@@ -729,7 +729,7 @@
         <div class="sig-analysis">
           반도체 섹터 강세 지속. NVDA 실적 기대감으로 기술주 전반 상승 압력.
           삼성전자 HBM 수혜 기대감 유효. BTC 단기 조정 후 $70K 재도전 예상.
-          — <strong style="color:var(--lime)">BULLISH</strong>
+          — <strong style="color:var(--accent)">BULLISH</strong>
         </div>
       </div>
     </section>
@@ -771,8 +771,8 @@
       ripples.push({ x: e.clientX, y: e.clientY, r: 0, life: 1 });
     });
 
-    // Lime green — matches bg.jpg background
-    const R = 204, G = 255, B = 0;
+    // Monotone grey dots
+    const R = 180, G = 180, B = 180;
 
     class Neuron {
       constructor() { this.init(); }
