@@ -4,12 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Edgar AI — Architecture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
       --bg:     #0a0a0a;
-      --lime:   #c8c8c8;
+      --lime:   #7aaa00;
       --white:  #f0f0f0;
       --muted:  rgba(240, 240, 240, 0.42);
       --border: rgba(255, 255, 255, 0.08);
@@ -51,9 +54,10 @@
     }
 
     .nav-logo {
-      font-family: 'Courier New', 'SF Mono', Courier, monospace;
+      font-family: 'Josefin Sans', 'Futura', 'Century Gothic', sans-serif;
       font-size: 1rem;
-      letter-spacing: 0.18em;
+      font-weight: 300;
+      letter-spacing: 0.22em;
       color: var(--lime);
       text-decoration: none;
     }
@@ -109,10 +113,10 @@
     }
 
     .page-title {
-      font-family: 'Courier New', 'SF Mono', Courier, monospace;
+      font-family: 'Josefin Sans', 'Futura', 'Century Gothic', sans-serif;
       font-size: clamp(1.8rem, 4vw, 2.8rem);
-      font-weight: 400;
-      letter-spacing: 0.08em;
+      font-weight: 300;
+      letter-spacing: 0.18em;
       color: var(--lime);
       margin-bottom: 0.8rem;
     }
@@ -632,7 +636,7 @@
     resize();
     window.addEventListener('resize', resize);
 
-    const R = 180, G = 180, B = 180;
+    const R = 204, G = 255, B = 0;
 
     const pts = Array.from({ length: 52 }, () => ({
       x:  Math.random() * window.innerWidth,

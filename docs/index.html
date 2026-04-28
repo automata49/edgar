@@ -11,16 +11,20 @@
   <meta property="og:title" content="edgar AI — Things in Motion">
   <meta property="og:image" content="https://edgar.ai/bg.jpg">
   <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg:     #0a0a0a;
-      --accent: #c8c8c8;
-      --white:  #f0f0f0;
-      --muted:  rgba(240, 240, 240, 0.42);
-      --border: rgba(255, 255, 255, 0.08);
-      --glass:  rgba(12, 12, 12, 0.80);
+      --bg:        #0a0a0a;
+      --accent:    #c8c8c8;
+      --lime-dark: #7aaa00;
+      --white:     #f0f0f0;
+      --muted:     rgba(240, 240, 240, 0.42);
+      --border:    rgba(255, 255, 255, 0.08);
+      --glass:     rgba(12, 12, 12, 0.80);
     }
 
     html { scroll-behavior: smooth; }
@@ -59,10 +63,11 @@
     }
 
     .nav-logo {
-      font-family: 'Courier New', 'SF Mono', Courier, monospace;
+      font-family: 'Josefin Sans', 'Futura', 'Century Gothic', sans-serif;
       font-size: 1rem;
-      letter-spacing: 0.18em;
-      color: var(--accent);
+      font-weight: 300;
+      letter-spacing: 0.22em;
+      color: var(--lime-dark);
     }
 
     .nav-links {
@@ -141,11 +146,11 @@
     }
 
     .hero-title {
-      font-family: 'Courier New', 'SF Mono', Courier, monospace;
+      font-family: 'Josefin Sans', 'Futura', 'Century Gothic', sans-serif;
       font-size: clamp(2.4rem, 6vw, 5rem);
-      font-weight: 400;
-      letter-spacing: 0.06em;
-      color: var(--accent);
+      font-weight: 300;
+      letter-spacing: 0.14em;
+      color: var(--lime-dark);
       margin-bottom: 0.55rem;
     }
 
@@ -473,10 +478,11 @@
     }
 
     .foot-logo {
-      font-family: 'Courier New', monospace;
+      font-family: 'Josefin Sans', 'Futura', 'Century Gothic', sans-serif;
       font-size: 1.3rem;
-      color: var(--accent);
-      letter-spacing: 0.18em;
+      font-weight: 300;
+      color: var(--lime-dark);
+      letter-spacing: 0.22em;
       margin-bottom: 0.45rem;
     }
 
@@ -771,8 +777,8 @@
       ripples.push({ x: e.clientX, y: e.clientY, r: 0, life: 1 });
     });
 
-    // Monotone grey dots
-    const R = 180, G = 180, B = 180;
+    // Lime green neural dots
+    const R = 204, G = 255, B = 0;
 
     class Neuron {
       constructor() { this.init(); }
