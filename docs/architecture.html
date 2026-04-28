@@ -11,18 +11,19 @@
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg:     #606060;
-      --lime:   #a8d400;
-      --white:  #f0f0f0;
-      --muted:  rgba(240, 240, 240, 0.42);
-      --border: rgba(255, 255, 255, 0.10);
-      --glass:  rgba(80, 80, 80, 0.88);
+      --bg:     #f5f0e8;
+      --lime:   #5c8500;
+      --white:  #1c1c1c;
+      --muted:  rgba(28, 28, 28, 0.52);
+      --border: rgba(0, 0, 0, 0.10);
+      --glass:  rgba(245, 240, 232, 0.92);
     }
 
     html { scroll-behavior: smooth; }
 
     body {
-      background: var(--bg);
+      background-color: var(--bg);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.68' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.038'/%3E%3C/svg%3E");
       font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
       font-weight: 300;
       color: var(--white);
@@ -36,7 +37,7 @@
       inset: 0;
       z-index: 0;
       pointer-events: none;
-      opacity: 0.32;
+      opacity: 0.42;
     }
 
     /* ── Nav ── */
@@ -48,7 +49,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 1.1rem 2.5rem;
-      background: rgba(70, 70, 70, 0.92);
+      background: rgba(245, 240, 232, 0.94);
       backdrop-filter: blur(20px);
       border-bottom: 1px solid var(--border);
     }
@@ -82,7 +83,7 @@
     .nav-tag {
       font-size: 0.62rem;
       padding: 0.22rem 0.8rem;
-      border: 1px solid rgba(255, 255, 255, 0.20);
+      border: 1px solid rgba(0, 0, 0, 0.20);
       border-radius: 20px;
       color: var(--lime);
       letter-spacing: 0.18em;
@@ -161,12 +162,12 @@
       border: 1px solid;
     }
 
-    .lbl-ext     { color: var(--muted);  border-color: rgba(240,240,240,0.15); background: rgba(240,240,240,0.04); }
-    .lbl-collect { color: var(--lime);   border-color: rgba(255,255,255,0.20);   background: rgba(255,255,255,0.03); }
-    .lbl-analyze { color: #88d8ff;       border-color: rgba(136,216,255,0.28); background: rgba(136,216,255,0.04); }
-    .lbl-store   { color: #a8ffa8;       border-color: rgba(168,255,168,0.28); background: rgba(168,255,168,0.04); }
-    .lbl-output  { color: #ffdd88;       border-color: rgba(255,221,136,0.28); background: rgba(255,221,136,0.04); }
-    .lbl-user    { color: #ff9988;       border-color: rgba(255,153,136,0.28); background: rgba(255,153,136,0.04); }
+    .lbl-ext     { color: var(--muted);  border-color: rgba(0,0,0,0.15);       background: rgba(0,0,0,0.04); }
+    .lbl-collect { color: var(--lime);   border-color: rgba(92,133,0,0.35);    background: rgba(92,133,0,0.06); }
+    .lbl-analyze { color: #2277aa;       border-color: rgba(34,119,170,0.30);  background: rgba(34,119,170,0.05); }
+    .lbl-store   { color: #2a7a2a;       border-color: rgba(42,122,42,0.30);   background: rgba(42,122,42,0.05); }
+    .lbl-output  { color: #8a6400;       border-color: rgba(138,100,0,0.28);   background: rgba(138,100,0,0.04); }
+    .lbl-user    { color: #aa3322;       border-color: rgba(170,51,34,0.28);   background: rgba(170,51,34,0.04); }
 
     .layer-row {
       display: flex;
@@ -200,17 +201,17 @@
     }
 
     .c-lime  .mod-name { color: var(--lime); }
-    .c-blue  .mod-name { color: #88d8ff; }
-    .c-green .mod-name { color: #a8ffa8; }
-    .c-amber .mod-name { color: #ffdd88; }
-    .c-red   .mod-name { color: #ff9988; }
+    .c-blue  .mod-name { color: #2277aa; }
+    .c-green .mod-name { color: #2a7a2a; }
+    .c-amber .mod-name { color: #8a6400; }
+    .c-red   .mod-name { color: #aa3322; }
     .c-muted .mod-name { color: var(--muted); }
 
-    .mod:hover.c-lime  { border-color: rgba(255,255,255,0.22); }
-    .mod:hover.c-blue  { border-color: rgba(136,216,255,0.35); }
-    .mod:hover.c-green { border-color: rgba(168,255,168,0.35); }
-    .mod:hover.c-amber { border-color: rgba(255,221,136,0.35); }
-    .mod:hover.c-red   { border-color: rgba(255,153,136,0.35); }
+    .mod:hover.c-lime  { border-color: rgba(92,133,0,0.35); }
+    .mod:hover.c-blue  { border-color: rgba(34,119,170,0.35); }
+    .mod:hover.c-green { border-color: rgba(42,122,42,0.35); }
+    .mod:hover.c-amber { border-color: rgba(138,100,0,0.35); }
+    .mod:hover.c-red   { border-color: rgba(170,51,34,0.35); }
 
     .mod-desc {
       font-size: 0.7rem;
@@ -221,7 +222,7 @@
     .mod-file {
       font-family: 'Courier New', monospace;
       font-size: 0.6rem;
-      color: rgba(255, 255, 255, 0.18);
+      color: rgba(0, 0, 0, 0.30);
       display: block;
       margin-top: 0.4rem;
     }
@@ -247,7 +248,7 @@
     .arrow-down {
       width: 1px;
       height: 36px;
-      background: linear-gradient(to bottom, rgba(255,255,255,0.25), rgba(255,255,255,0.03));
+      background: linear-gradient(to bottom, rgba(0,0,0,0.22), rgba(0,0,0,0.03));
       position: relative;
     }
 
@@ -259,7 +260,7 @@
       transform: translateX(-50%);
       border-left: 4px solid transparent;
       border-right: 4px solid transparent;
-      border-top: 6px solid rgba(255,255,255,0.25);
+      border-top: 6px solid rgba(0,0,0,0.22);
     }
 
     /* ── Legend ── */
@@ -323,21 +324,21 @@
     .flow-icon {
       width: 56px; height: 56px;
       border-radius: 50%;
-      border: 1px solid rgba(255,255,255,0.14);
+      border: 1px solid rgba(0,0,0,0.14);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 1.4rem;
       margin: 0 auto 0.6rem;
-      background: rgba(255,255,255,0.03);
+      background: rgba(0,0,0,0.03);
       transition: box-shadow 0.3s;
     }
 
-    .flow-icon:hover { box-shadow: 0 0 20px rgba(255,255,255,0.14); }
+    .flow-icon:hover { box-shadow: 0 0 20px rgba(0,0,0,0.12); }
 
     .flow-name { font-size: 0.85rem; font-weight: 400; margin-bottom: 0.2rem; }
     .flow-sub  { font-size: 0.7rem; color: var(--muted); }
-    .flow-arrow { font-size: 1.1rem; color: rgba(255,255,255,0.14); flex-shrink: 0; padding: 0 0.2rem; }
+    .flow-arrow { font-size: 1.1rem; color: rgba(0,0,0,0.22); flex-shrink: 0; padding: 0 0.2rem; }
 
     /* ── Back link ── */
     .back-link {
@@ -578,10 +579,10 @@
     <div class="legend">
       <div class="legend-item"><span class="legend-dot" style="background:var(--muted)"></span>외부 API / 데이터 소스</div>
       <div class="legend-item"><span class="legend-dot" style="background:var(--lime)"></span>수집 (Collectors)</div>
-      <div class="legend-item"><span class="legend-dot" style="background:#88d8ff"></span>분석 / 오케스트레이터</div>
-      <div class="legend-item"><span class="legend-dot" style="background:#a8ffa8"></span>저장 (Supabase)</div>
-      <div class="legend-item"><span class="legend-dot" style="background:#ffdd88"></span>출력 (발송 / 영상)</div>
-      <div class="legend-item"><span class="legend-dot" style="background:#ff9988"></span>사용자 인터페이스</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#2277aa"></span>분석 / 오케스트레이터</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#2a7a2a"></span>저장 (Supabase)</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#8a6400"></span>출력 (발송 / 영상)</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#aa3322"></span>사용자 인터페이스</div>
     </div>
 
     <!-- Data flow -->
@@ -636,7 +637,7 @@
     resize();
     window.addEventListener('resize', resize);
 
-    const R = 204, G = 255, B = 0;
+    const R = 92, G = 133, B = 0;
 
     const pts = Array.from({ length: 52 }, () => ({
       x:  Math.random() * window.innerWidth,
