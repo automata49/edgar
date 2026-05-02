@@ -57,6 +57,11 @@ _QUALITY = (
 )
 
 _FORMAT_PROMPTS: dict[str, str] = {
+    "korean_short": (
+        "clean minimal Korean financial data visualization, dark navy gradient background, "
+        "subtle glowing stock charts, soft professional studio lighting, "
+        "premium editorial aesthetic, no people, no text, "
+    ),
     "news_parody": (
         "modern television news broadcast studio at night, dramatic red and blue ambient glow, "
         "multiple holographic screens showing stock charts and financial data, "
@@ -86,6 +91,30 @@ _FORMAT_PROMPTS: dict[str, str] = {
 }
 
 _VISUAL_NOTE_PROMPTS: dict[str, str] = {
+    "k_context_green": (
+        "clean dark studio with soft emerald green accent light, "
+        "minimal financial background, calm professional atmosphere, "
+    ),
+    "k_context_red": (
+        "dark studio with deep crimson undertone, "
+        "minimal financial background, tense professional atmosphere, "
+    ),
+    "k_context_blue": (
+        "clean dark studio with cool blue accent light, "
+        "minimal financial chart background, neutral professional atmosphere, "
+    ),
+    "k_value_green": (
+        "dramatic emerald spotlight illuminating dark space, "
+        "stock chart uptrend glow, high stakes financial moment, "
+    ),
+    "k_value_red": (
+        "dramatic crimson alert lighting in dark space, "
+        "stock chart downtrend glow, urgent financial moment, "
+    ),
+    "k_value_blue": (
+        "dramatic electric blue spotlight in dark space, "
+        "financial data streams, focused analytical moment, "
+    ),
     "celeb_setting": (
         "epic ocean vista at night, moonlit waves, two distant silhouettes on cliffside, "
         "atmospheric fog rolling in, stars reflecting on water, "
@@ -183,8 +212,14 @@ class AIVideoGenerator:
         # 씬 명세 목록 수집 (scene, text, subtext, dur, is_hook, is_cta)
         specs = self._collect_specs(script)
 
-        # AI 백엔드: 모든 배경 이미지를 병렬로 사전 생성 → 전체 시간 ≈ 1장 시간
+        # AI 백엔드: 모든 배경 이미지를 사전 생성
         bg_imgs = self._prefetch_backgrounds(specs, script, fmt)
+
+        # prefetch가 전부 실패했으면 PIL로 즉시 폴백 (재시도 낭비 방지)
+        prefetch_ok = any(x is not None for x in bg_imgs)
+        if not prefetch_ok and self.backend in ("pollinations", "hf", "flux"):
+            print(f"      ℹ️  AI 배경 전체 실패 → PIL 모드로 전환")
+            self.backend = "pil"
 
         # 클립 조립
         clips: list = []
@@ -247,7 +282,10 @@ class AIVideoGenerator:
         n = len(specs)
 
         if self.backend in ("pollinations", "horde"):
+            import time as _time
             for i, spec in enumerate(specs):
+                if i > 0:
+                    _time.sleep(3)  # rate limit 방지
                 prompt = self._build_prompt(spec[0], script, fmt)
                 print(f"      🎨 배경 {i+1}/{n}…")
                 try:
@@ -329,7 +367,11 @@ class AIVideoGenerator:
             return self._bg_wan2(scene, script, fmt, duration)
         if self.backend in ("flux", "pollinations", "hf"):
             # 단독 호출 시 개별 생성 (병렬 prefetch 없이 실행된 경우)
-            img = self._fetch_ai_image(self._build_prompt(scene, script, fmt))
+            try:
+                img = self._fetch_ai_image(self._build_prompt(scene, script, fmt))
+            except Exception as e:
+                print(f"      ⚠️  AI 배경 실패 → PIL 폴백 ({e})")
+                img = None
             if img:
                 direction = random.choice(["zoom_in", "zoom_out", "pan_right", "pan_left"])
                 return self._ken_burns(np.array(img), duration, direction=direction)
@@ -375,6 +417,7 @@ class AIVideoGenerator:
         오픈소스 모델(black-forest-labs/FLUX.1-dev) 무료 서빙.
         https://pollinations.ai
         """
+        import time as _time
         from urllib.parse import quote
         seed = random.randint(0, 999999)
         url  = (
@@ -382,9 +425,16 @@ class AIVideoGenerator:
             f"?width={W}&height={H}&model=flux&seed={seed}"
             f"&nologo=true&nofeed=true&enhance=false"
         )
-        r = requests.get(url, timeout=90, headers={"User-Agent": "Edgar-Bot/1.0"})
-        r.raise_for_status()
-        return Image.open(io.BytesIO(r.content)).convert("RGB").resize((W, H), Image.LANCZOS)
+        for attempt in range(3):
+            r = requests.get(url, timeout=90, headers={"User-Agent": "Edgar-Bot/1.0"})
+            if r.status_code == 429:
+                wait = 15 * (attempt + 1)
+                print(f"      ⏳ Pollinations 429 — {wait}s 대기 후 재시도…")
+                _time.sleep(wait)
+                continue
+            r.raise_for_status()
+            return Image.open(io.BytesIO(r.content)).convert("RGB").resize((W, H), Image.LANCZOS)
+        raise Exception("Pollinations 429 — 3회 재시도 실패")
 
     def _hf_fetch(self, prompt: str) -> Optional[Image.Image]:
         """
@@ -490,7 +540,8 @@ class AIVideoGenerator:
 
         # Vertical gradient
         palettes = {
-            "celeb_collab":   [(5, 5, 20),   (15, 15, 45)],
+            "korean_short":   [(5, 10, 22),   (12, 18, 40)],
+            "celeb_collab":   [(5, 5, 20),    (15, 15, 45)],
             "news_parody":    [(8, 15, 35),   (20, 25, 55)],
             "drama_twist":    [(5, 5, 8),     (15, 12, 18)],
             "meme_sequence":  [(10, 10, 10),  (25, 20, 35)],
@@ -819,12 +870,17 @@ class AIVideoGenerator:
     # TTS ─────────────────────────────────────────────────────────────────────
 
     def _gen_tts(self, script) -> Optional[str]:
-        lines: list[str] = [script.hook_text]
-        for s in (script.scenes or []):
-            if getattr(s, 'dialogue', ''):
-                lines.append(s.dialogue)
-        lines.append(getattr(script, 'cta_text', ''))
-        full_text = "... ".join(filter(None, lines))[:3000]
+        # full_narration 우선 (KoreanShortScript 어댑터 경유 시)
+        full_narration = getattr(script, "full_narration", "")
+        if full_narration and full_narration.strip():
+            full_text = full_narration[:3000]
+        else:
+            lines: list[str] = [script.hook_text]
+            for s in (script.scenes or []):
+                if getattr(s, 'dialogue', ''):
+                    lines.append(s.dialogue)
+            lines.append(getattr(script, 'cta_text', ''))
+            full_text = "... ".join(filter(None, lines))[:3000]
 
         # 한국어 비율로 voice 선택
         kr_count = sum(1 for c in full_text if '가' <= c <= '힣')
@@ -937,6 +993,7 @@ class AIVideoGenerator:
             "white":  (200, 200, 220),
         }
         fmt_map = {
+            "korean_short":   (60, 140, 255),
             "news_parody":    (200, 30, 30),
             "drama_twist":    (230, 180, 0),
             "celeb_collab":   (80, 130, 240),

@@ -24,8 +24,18 @@ async def main() -> None:
     scheduler = SignalScheduler(CONFIG, bot=None, db=db)
     dry       = "--dry" in sys.argv
 
-    if "--shorts" in sys.argv:
-        # 숏폼 파이프라인만 실행 (시장 분석 / 텔레그램 생략)
+    if "--korean" in sys.argv:
+        # 한국어 30초 숏폼 파이프라인 단독 실행
+        from kstock_signal.pipelines.korean_shorts import KoreanShortsPipeline
+        pipeline = KoreanShortsPipeline(CONFIG, bot=None)
+        result   = await pipeline.run(dry_run=dry)
+        print(
+            f"\n결과: 리포트 {result['reports']}건 · 요약 {result['summaries']}개 · "
+            f"대본 {result['scripts']}개 · 영상 {len(result['videos'])}개"
+        )
+
+    elif "--shorts" in sys.argv:
+        # 엔터테인먼트 숏폼 파이프라인만 실행
         result = await scheduler._run_shorts_pipeline(dry_run=dry)
         print(f"\n결과: 스크립트 {len(result['scripts'])}개 · 영상 {len(result['videos'])}개 · 업로드 {len(result['uploads'])}개")
 

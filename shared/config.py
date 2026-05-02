@@ -74,6 +74,26 @@ CONFIG: dict = {
     "naver_report": {
         "target_symbols": [],
         "max_reports": 3,
+        "save_dir": os.getenv("NAVER_REPORT_DIR", os.path.join(_PROJECT_ROOT, "data", "naver_reports")),
+    },
+
+    # ── Report Summary (1단계: 종목별 한국어 요약) ────────────────
+    "report_summary": {
+        "output_dir": os.getenv("SUMMARY_DIR", os.path.join(_PROJECT_ROOT, "data", "summaries")),
+        "max_text_chars": 3000,
+    },
+
+    # ── Korean Short Script (2단계: 30초 한국어 대본) ─────────────
+    "korean_script": {
+        "output_dir": os.getenv("KSCRIPT_DIR", os.path.join(_PROJECT_ROOT, "data", "scripts")),
+        "video_dir":  os.getenv("KVIDEO_DIR",  os.path.join(_PROJECT_ROOT, "data", "videos")),
+    },
+
+    # ── Korean Shorts Pipeline 통합 스위치 ────────────────────────
+    "korean_shorts": {
+        "enabled":          os.getenv("KOREAN_SHORTS_ENABLED", "false").lower() == "true",
+        "notify_telegram":  os.getenv("KOREAN_SHORTS_NOTIFY", "true").lower() == "true",
+        "max_reports":      int(os.getenv("KOREAN_SHORTS_MAX", "5")),
     },
 
     # ── Short-form Video Pipeline ─────────────────────────────

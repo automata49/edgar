@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -17,6 +18,11 @@ _HEADERS = {
     "Referer": "https://finance.naver.com/",
 }
 _LIST_URL = "https://finance.naver.com/research/company_list.naver"
+
+
+def _safe_dirname(name: str) -> str:
+    """파일/디렉토리명에 사용할 수 없는 문자를 제거."""
+    return re.sub(r"[^\w가-힣\-]", "_", name).strip("_") or "unknown"
 
 
 @dataclass
@@ -39,6 +45,7 @@ class NaverReportCollector:
         cfg = config.get("naver_report", {})
         self.target_symbols: list[str] = cfg.get("target_symbols", [])
         self.max_reports:    int        = cfg.get("max_reports", 3)
+        self.save_dir:       str | None = cfg.get("save_dir")
         self.session = requests.Session()
         self.session.headers.update(_HEADERS)
 
@@ -54,10 +61,12 @@ class NaverReportCollector:
         results: list[dict] = []
 
         for rpt in reports:
-            text = self._extract_pdf_text(rpt.pdf_url)
-            if text:
-                rpt.text        = text
-                rpt.key_numbers = self._extract_key_numbers(text)
+            pdf_bytes = self._fetch_pdf_bytes(rpt.pdf_url)
+            if pdf_bytes:
+                rpt.text        = self._parse_pdf_text(pdf_bytes)
+                rpt.key_numbers = self._extract_key_numbers(rpt.text)
+                if self.save_dir:
+                    self._save_pdf(pdf_bytes, rpt)
             results.append(self._to_dict(rpt))
             time.sleep(0.5)  # 서버 부하 방지
 
@@ -126,26 +135,43 @@ class NaverReportCollector:
             print(f"   ⚠️  네이버 리포트 리스트 오류: {e}")
         return reports
 
-    # ── PDF Extraction ───────────────────────────────────────────────────────
+    # ── PDF Fetch / Parse / Save ─────────────────────────────────────────────
 
-    def _extract_pdf_text(self, pdf_url: str) -> str:
+    def _fetch_pdf_bytes(self, pdf_url: str) -> bytes | None:
         if not pdf_url:
-            return ""
+            return None
         try:
             r = self.session.get(pdf_url, timeout=15)
             if r.status_code != 200 or len(r.content) < 100:
-                return ""
-            # Naver는 PDF를 application/octet-stream으로 서빙 — magic bytes로 검증
+                return None
             if not r.content.startswith(b"%PDF"):
-                return ""
+                return None
+            return r.content
+        except Exception as e:
+            print(f"   ⚠️  PDF 다운로드 실패 ({pdf_url[:60]}): {e}")
+            return None
 
-            with pdfplumber.open(io.BytesIO(r.content)) as pdf:
-                pages = pdf.pages[:8]  # 처음 8페이지만 (리포트 요약부)
+    def _parse_pdf_text(self, pdf_bytes: bytes) -> str:
+        try:
+            with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+                pages = pdf.pages[:8]
                 text  = "\n".join(p.extract_text() or "" for p in pages)
             return text.strip()
         except Exception as e:
-            print(f"   ⚠️  PDF 추출 실패 ({pdf_url[:60]}): {e}")
+            print(f"   ⚠️  PDF 텍스트 추출 실패: {e}")
             return ""
+
+    def _save_pdf(self, pdf_bytes: bytes, rpt: NaverReport) -> None:
+        try:
+            stock_dir = os.path.join(self.save_dir, _safe_dirname(rpt.stock_name))
+            os.makedirs(stock_dir, exist_ok=True)
+            slug  = re.sub(r"[^\w가-힣\-]", "_", rpt.title)[:40]
+            fname = f"{rpt.date}_{_safe_dirname(rpt.firm)}_{slug}.pdf"
+            path  = os.path.join(stock_dir, fname)
+            with open(path, "wb") as f:
+                f.write(pdf_bytes)
+        except Exception as e:
+            print(f"   ⚠️  PDF 저장 실패 ({rpt.stock_name}): {e}")
 
     # ── Key Number Extraction ────────────────────────────────────────────────
 

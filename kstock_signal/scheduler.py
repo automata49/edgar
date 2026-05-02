@@ -68,13 +68,18 @@ class SignalScheduler:
         if not dry_run and self.bot:
             await self._broadcast(analysis, stats, market_data, youtube_data, news_data)
 
-        # 6. 숏폼 파이프라인 (SHORTVIDEO_ENABLED=true 시 실행)
+        # 6. 엔터테인먼트 숏폼 파이프라인 (SHORTVIDEO_ENABLED=true 시 실행)
         shorts_result = {}
         if self.config.get("shortvideo", {}).get("enabled"):
             shorts_result = await self._run_shorts_pipeline(dry_run)
 
+        # 7. 한국어 30초 숏폼 파이프라인 (KOREAN_SHORTS_ENABLED=true 시 실행)
+        korean_result = {}
+        if self.config.get("korean_shorts", {}).get("enabled"):
+            korean_result = await self._run_korean_shorts_pipeline(dry_run)
+
         print("✅ 완료\n" + "=" * 60 + "\n")
-        return {"analysis": analysis, "stats": stats, "shorts": shorts_result}
+        return {"analysis": analysis, "stats": stats, "shorts": shorts_result, "korean_shorts": korean_result}
 
     # ── Init ─────────────────────────────────────────────────────────────────
 
@@ -238,6 +243,16 @@ class SignalScheduler:
 
         print(f"✅ 숏폼: 스크립트 {len(result['scripts'])}개 · 영상 {len(result['videos'])}개 · 업로드 {len(result['uploads'])}개\n")
         return result
+
+    async def _run_korean_shorts_pipeline(self, dry_run: bool) -> dict:
+        """KOREAN_SHORTS_ENABLED=true 시 한국어 30초 숏폼 파이프라인 실행."""
+        try:
+            from kstock_signal.pipelines.korean_shorts import KoreanShortsPipeline
+            pipeline = KoreanShortsPipeline(self.config, bot=self.bot)
+            return await pipeline.run(dry_run=dry_run)
+        except Exception as e:
+            print(f"   ⚠️  Korean Shorts 파이프라인 오류: {e}")
+            return {}
 
     async def _run_heygen_collab(self, script, celeb_chars: list) -> str | None:
         """
