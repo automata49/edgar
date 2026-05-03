@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"${CLAUDE_TOOL_INPUT_FILE_PATH:-}\"; [[ \"$f\" == *.py ]] && cd /home/user/edgar && python -m ruff check --fix \"$f\" 2>&1 | head -8 || true"
+            "command": "f=\"${CLAUDE_TOOL_INPUT_FILE_PATH:-}\"; [[ \"$f\" == *.py ]] && cd /workspaces/Edgar && python -m ruff check --fix \"$f\" 2>&1 | head -8 || true"
           }
         ]
       }
@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd /home/user/edgar && python -c \"from shared.config import CONFIG; from database.client import SupabaseDB; from kstock_signal.scheduler import SignalScheduler; from telegram_bot.main import create_app; print('✅ import check passed')\" 2>&1"
+            "command": "cd /workspaces/Edgar && python -c \"from shared.config import CONFIG; from database.client import SupabaseDB; from kstock_signal.scheduler import SignalScheduler; from telegram_bot.main import create_app; print('✅ import check passed')\" 2>&1"
           }
         ]
       }

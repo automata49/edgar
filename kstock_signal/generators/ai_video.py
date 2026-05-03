@@ -509,13 +509,12 @@ class AIVideoGenerator:
         prompt     = self._wan2_prompt(scene, script, fmt)
         num_frames = min(81, max(17, int(duration * FPS * 0.5)))  # ~15fps 기준
 
-        # 14B 시도 → 1.3B 폴백 (품질 우선)
-        for model_id in (
-            "fal-ai/wan/v2.1/14b/text-to-video",
-            "fal-ai/wan/v2.1/1.3b/text-to-video",
+        # 14B(Pro) 시도 → 1.3B(Standard) 폴백 (품질 우선)
+        for model_id, label in (
+            ("fal-ai/wan-pro/text-to-video", "14b"),
+            ("fal-ai/wan-t2v",               "1.3b"),
         ):
             try:
-                label = model_id.split("/")[-2]
                 print(f"      🤖 Wan2.1-{label} ({duration:.0f}s, {num_frames}f)…")
                 result = fal_client.subscribe(
                     model_id,
@@ -528,7 +527,7 @@ class AIVideoGenerator:
                 url = result["video"]["url"]
                 return self._url_to_clip(url, duration)
             except Exception as e:
-                print(f"      ⚠️  {label} 실패 ({str(e)[:60]})")
+                print(f"      ⚠️  {label} 실패 ({str(e)[:80]})")
 
         print("      ⚠️  Wan2.1 전체 실패 → Flux")
         return self._bg_flux(scene, script, fmt, duration)
