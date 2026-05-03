@@ -6,7 +6,8 @@
 텔레그램으로 전송하는 자동화 봇. Supabase(PostgreSQL)에 모든 데이터 보관.
 
 **인프라**: GitHub Codespaces(개발) → Oracle Cloud ARM VM(운영)  
-**AI**: Claude Sonnet(챗봇) + DeepSeek/Groq/Gemini(시장 분석)
+**AI**: Claude Sonnet(챗봇) + DeepSeek/Groq/Gemini(시장 분석)  
+**영상**: Wan2.1 14B (fal.ai) AI 동영상 생성 → YouTube Shorts 자동 업로드
 
 ---
 
@@ -25,15 +26,17 @@ telegram_bot/             ← 사용자 인터페이스
 
 kstock_signal/            ← 데이터 파이프라인
   scheduler.py            ← SignalScheduler (전체 파이프라인 오케스트레이터)
-  main.py                 ← 단독 실행 진입점 (--once, --dry 플래그)
+  main.py                 ← 단독 실행 진입점 (--once / --shorts / --korean / --dry 플래그)
   collectors/market.py    ← yfinance + CoinGecko (50+ 심볼)
   collectors/youtube.py   ← YouTube Data API + 자막
   collectors/news.py      ← RSS feedparser
-  collectors/naver_report.py ← 네이버 금융 종목분석 리포트 PDF 수집
+  collectors/naver_report.py     ← 네이버 금융 종목분석 리포트 PDF 수집
+  collectors/shortvideo_trend.py ← YouTube Trending(mostPopular) + 한/영 키워드 트렌드 수집
   analyzers/trend.py      ← TrendAnalyzer (deepseek/groq/gemini/claude)
   analyzers/script.py     ← ScriptGenerator (숏폼 스크립트 생성, 5포맷 + celeb_collab)
   analyzers/celeb_cast.py ← CelebCaster (리포트→CEO 캐릭터 매핑, 12개 기업 DB)
-  generators/video.py     ← VideoGenerator (PIL+moviepy 렌더러, 6포맷 지원)
+  generators/video.py     ← VideoGenerator (PIL+moviepy 정적 렌더러, 6포맷)
+  generators/ai_video.py  ← AIVideoGenerator (Wan2.1 14B 병렬 AI 영상 생성, 폴백: 1.3B→Flux→PIL)
   generators/heygen.py    ← HeyGenClient (AI 아바타 영상 생성 API)
   reporters/telegram.py   ← TelegramReporter (메시지 포맷 + 발송)
 ```
@@ -43,15 +46,22 @@ kstock_signal/            ← 데이터 파이프라인
 ```
 SignalScheduler.run()
   │
-  ├─ MarketCollector.collect()   → dict[symbol, price_data]
-  ├─ YouTubeCollector.collect()  → list[video_dict]
-  ├─ NewsCollector.collect()     → list[article_dict]
+  ├─ MarketCollector.collect()          → dict[symbol, price_data]
+  ├─ YouTubeCollector.collect()         → list[video_dict]
+  ├─ NewsCollector.collect()            → list[article_dict]
   │
-  ├─ TrendAnalyzer.analyze()     → analysis: str
+  ├─ TrendAnalyzer.analyze()            → analysis: str
   │
-  ├─ SupabaseDB.save_*()         → Supabase 저장
-  ├─ /tmp/latest_report.txt      → /report 명령용 캐시
-  └─ TelegramReporter.send()     → 텔레그램 발송
+  ├─ SupabaseDB.save_*()                → Supabase 저장
+  ├─ /tmp/latest_report.txt             → /report 명령용 캐시
+  ├─ TelegramReporter.send()            → 텔레그램 발송
+  │
+  └─ [SHORTVIDEO_ENABLED=true 시]
+       ShortVideoTrendCollector.collect() → YouTube Trending + 키워드 트렌드 패턴
+       NaverReportCollector.collect()     → PDF 리포트
+       ScriptGenerator.generate_celeb()  → celeb_collab 스크립트 (LLM)
+       AIVideoGenerator.generate()       → Wan2.1 14B 병렬 클립 → MP4
+       YouTubePublisher.upload()         → YouTube Shorts 업로드
 ```
 
 ---
@@ -62,11 +72,18 @@ SignalScheduler.run()
 # 텔레그램 봇 (스케줄러 포함)
 python telegram_bot/main.py
 
-# 신호 단독 실행 (1회)
+# 전체 파이프라인 1회 실행
 python kstock_signal/main.py --once
 
-# 신호 dry-run (텔레그램 발송 없음)
+# 전체 파이프라인 dry-run (텔레그램/업로드 생략)
 python kstock_signal/main.py --once --dry
+
+# 숏폼 영상 파이프라인만 실행 (Wan2.1 AI 영상 생성)
+python kstock_signal/main.py --shorts --dry   # dry-run (영상 생성 O, 업로드 X)
+python kstock_signal/main.py --shorts          # 실제 실행 (영상 생성 + YouTube 업로드)
+
+# 한국어 30초 숏폼 파이프라인
+python kstock_signal/main.py --korean --dry
 
 # 헬스 체크
 python scripts/health_check.py
@@ -78,19 +95,23 @@ python scripts/health_check.py
 
 | 변수 | 필수 | 설명 |
 |------|------|------|
-| TELEGRAM_BOT_TOKEN | ✅ | 텔레그램 봇 |
-| ANTHROPIC_API_KEY  | ✅ | Claude AI 챗봇 |
-| DEEPSEEK_API_KEY   | 권장 | 시장 분석 LLM |
-| YOUTUBE_API_KEY    | 선택 | YouTube 수집 |
-| SHORTS_AI_BACKEND  | 선택 | pollinations(기본·무료·키불필요) \| hf \| flux \| wan2 \| pil |
-| HF_TOKEN           | 선택 | HuggingFace 무료 토큰 (FLUX.1-schnell, https://huggingface.co/settings/tokens) |
-| FAL_KEY            | 선택 | fal.ai (Flux/Wan2.1 고품질, https://fal.ai) |
-| SUPABASE_URL       | 선택 | DB 저장 |
-| SUPABASE_KEY       | 선택 | DB 저장 |
-| LLM_PROVIDER       | 선택 | deepseek/groq/gemini/claude |
-| REPORT_STYLE       | 선택 | aggressive/professional/... |
-| REPORT_TIME        | 선택 | HH:MM (기본 08:00) |
-| HEYGEN_API_KEY     | 선택 | HeyGen AI 아바타 영상 생성 |
+| 변수 | 필수 | 설명 |
+|------|------|------|
+| TELEGRAM_BOT_TOKEN    | ✅ | 텔레그램 봇 |
+| ANTHROPIC_API_KEY     | ✅ | Claude AI 챗봇 |
+| DEEPSEEK_API_KEY      | 권장 | 시장 분석 LLM |
+| YOUTUBE_API_KEY       | 권장 | YouTube 수집 + 트렌드 수집 |
+| FAL_KEY               | 권장 | fal.ai Wan2.1 AI 영상 생성 (https://fal.ai) |
+| SHORTS_AI_BACKEND     | 선택 | **wan2**(권장) \| pollinations(무료) \| hf \| flux \| pil |
+| SHORTVIDEO_ENABLED    | 선택 | true 시 숏폼 파이프라인 활성화 (기본 false) |
+| HF_TOKEN              | 선택 | HuggingFace 토큰 (hf 백엔드 사용 시) |
+| SUPABASE_URL          | 선택 | DB 저장 |
+| SUPABASE_KEY          | 선택 | DB 저장 |
+| LLM_PROVIDER          | 선택 | deepseek/groq/gemini/claude |
+| REPORT_STYLE          | 선택 | aggressive/professional/... |
+| REPORT_TIME           | 선택 | HH:MM (기본 08:00) |
+| HEYGEN_API_KEY        | 선택 | HeyGen AI 아바타 영상 생성 |
+| KOREAN_SHORTS_ENABLED | 선택 | true 시 한국어 30초 숏폼 파이프라인 활성화 |
 
 ---
 
