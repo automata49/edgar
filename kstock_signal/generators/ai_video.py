@@ -56,6 +56,87 @@ _QUALITY = (
     "dramatic atmosphere, shallow depth of field, high contrast, sharp focus"
 )
 
+# ── Wan2.1 Motion Prompt Library ─────────────────────────────────────────────
+# Describes actual camera/scene motion — critical for video generation quality.
+
+_WAN2_MOTION: dict[str, str] = {
+    "celeb_setting": (
+        "slow cinematic dolly through moonlit ocean mist, waves ripple gently, "
+        "stars shimmer on water surface, atmospheric fog drifts in slow motion, "
+    ),
+    "celeb_twist": (
+        "dramatic push-in toward single red spotlight, smoke swirls in slow motion, "
+        "environment darkens progressively, tension builds, "
+    ),
+    "k_context_green": (
+        "slow zoom into emerald glowing stock chart, luminous data particles drift upward, "
+        "soft green light pulses rhythmically, "
+    ),
+    "k_context_red": (
+        "slow push toward crimson market alert display, particles cascade downward, "
+        "deep red light pulses with urgency, "
+    ),
+    "k_value_green": (
+        "camera orbits emerald light source, particles radiate outward in slow arcs, "
+        "upward momentum, triumphant atmosphere, "
+    ),
+    "k_value_red": (
+        "camera pushes toward red warning light, environment contracts and darkens gradually, "
+        "falling particles in slow motion, "
+    ),
+    "alert": (
+        "pulsing red alert lights strobe in slow motion, smoke fills dark control room, "
+        "urgent atmosphere with slow camera drift, "
+    ),
+    "news": (
+        "slow horizontal pan across holographic news broadcasts, "
+        "light refracts off polished studio floor, screens activate one by one, "
+    ),
+    "dark": (
+        "slow parallax through rain-streaked window, city lights blur bokeh and refocus, "
+        "raindrops trace paths down glass in slow motion, "
+    ),
+    "card": (
+        "gentle morning light streams through office window, dust motes float in beam, "
+        "slow rack focus from foreground to background, "
+    ),
+    "meme": (
+        "glitch effect ripples across neon grid, pixels distort and reform, "
+        "geometric patterns animate with digital energy, "
+    ),
+}
+
+_WAN2_FORMAT_MOTION: dict[str, str] = {
+    "news_parody": (
+        "slow horizontal pan across breaking news broadcast studio at night, "
+        "holographic market charts activate on screens, dramatic lighting shifts, "
+    ),
+    "character_skit": (
+        "moody atmospheric push-in through trading floor environment, "
+        "glowing monitors illuminate in sequence, bokeh city lights behind, "
+    ),
+    "meme_sequence": (
+        "bold neon grid pulses and expands, geometric neon lines animate outward, "
+        "high-energy digital atmosphere, "
+    ),
+    "drama_twist": (
+        "cinematic push-in through deep darkness, single spotlight intensifies gradually, "
+        "smoke particles drift across beam of light, "
+    ),
+    "pov": (
+        "first-person push toward glowing smartphone screen, "
+        "stock charts scroll upward, notification alerts pulse, "
+    ),
+    "celeb_collab": (
+        "slow orbital camera around two silhouettes against glowing city backdrop, "
+        "floor-to-ceiling windows reflect city lights below, "
+    ),
+    "korean_short": (
+        "smooth pan across dark financial data visualization, "
+        "numbers and charts shift elegantly, soft ambient glow, "
+    ),
+}
+
 _FORMAT_PROMPTS: dict[str, str] = {
     "korean_short": (
         "clean minimal Korean financial data visualization, dark navy gradient background, "
@@ -212,14 +293,18 @@ class AIVideoGenerator:
         # 씬 명세 목록 수집 (scene, text, subtext, dur, is_hook, is_cta)
         specs = self._collect_specs(script)
 
-        # AI 백엔드: 모든 배경 이미지를 사전 생성
-        bg_imgs = self._prefetch_backgrounds(specs, script, fmt)
-
-        # prefetch가 전부 실패했으면 PIL로 즉시 폴백 (재시도 낭비 방지)
-        prefetch_ok = any(x is not None for x in bg_imgs)
-        if not prefetch_ok and self.backend in ("pollinations", "hf", "flux"):
-            print(f"      ℹ️  AI 배경 전체 실패 → PIL 모드로 전환")
-            self.backend = "pil"
+        # Wan2.1 — 병렬 비디오 클립 사전 생성
+        if self.backend == "wan2":
+            bg_clips = self._prefetch_wan2_clips(specs, script, fmt)
+            bg_imgs  = [None] * len(specs)
+        else:
+            bg_clips = [None] * len(specs)
+            # 이미지 백엔드 — 병렬 이미지 사전 생성
+            bg_imgs = self._prefetch_backgrounds(specs, script, fmt)
+            prefetch_ok = any(x is not None for x in bg_imgs)
+            if not prefetch_ok and self.backend in ("pollinations", "hf", "flux"):
+                print("      ℹ️  AI 배경 전체 실패 → PIL 모드로 전환")
+                self.backend = "pil"
 
         # 클립 조립
         clips: list = []
@@ -229,6 +314,7 @@ class AIVideoGenerator:
                 text=text, subtext=subtext, duration=dur,
                 is_hook=is_hook, is_cta=is_cta,
                 prefetched_img=bg_imgs[i],
+                prefetched_clip=bg_clips[i],
             ))
 
         clips = self._apply_crossfades(clips)
@@ -326,6 +412,37 @@ class AIVideoGenerator:
             return self._flux_fetch(prompt)
         return None
 
+    # ── Wan2.1 Parallel Prefetch ──────────────────────────────────────────────
+
+    def _prefetch_wan2_clips(self, specs: list[tuple], script, fmt: str) -> list:
+        """Wan2.1 비디오 클립 병렬 생성 (ThreadPoolExecutor)."""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        n       = len(specs)
+        results = [None] * n
+
+        def fetch_one(idx: int, scene, dur: float) -> tuple[int, object]:
+            try:
+                return idx, self._bg_wan2(scene, script, fmt, dur)
+            except Exception as e:
+                print(f"      ⚠️  Wan2 [{idx+1}] 실패 → PIL ({e})")
+                return idx, None
+
+        workers = min(n, 3)  # fal.ai 동시 요청 제한 고려
+        print(f"      🤖 Wan2.1 {n}개 클립 병렬 생성 ({workers}w)…")
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(fetch_one, i, s[0], s[3]): i
+                for i, s in enumerate(specs)
+            }
+            for fut in as_completed(futures):
+                idx, clip = fut.result()
+                results[idx] = clip
+
+        ok = sum(1 for x in results if x is not None)
+        print(f"      ✅ Wan2 클립 {ok}/{n} 완료")
+        return results
+
     # ── Scene Clip Builder ────────────────────────────────────────────────────
 
     def _make_scene_clip(
@@ -339,9 +456,12 @@ class AIVideoGenerator:
         is_hook: bool = False,
         is_cta: bool = False,
         prefetched_img: Optional[Image.Image] = None,
+        prefetched_clip=None,
     ):
         bg = self._generate_background(
-            scene, script, fmt, duration, prefetched_img=prefetched_img
+            scene, script, fmt, duration,
+            prefetched_img=prefetched_img,
+            prefetched_clip=prefetched_clip,
         )
         overlays = self._build_text_overlays(
             text=text, subtext=subtext, duration=duration,
@@ -357,8 +477,13 @@ class AIVideoGenerator:
     def _generate_background(
         self, scene, script, fmt, duration,
         prefetched_img: Optional[Image.Image] = None,
+        prefetched_clip=None,
     ):
-        # 사전 생성된 AI 이미지가 있으면 바로 Ken Burns 적용
+        # 사전 생성된 Wan2.1 클립이 있으면 최우선 사용
+        if prefetched_clip is not None:
+            return prefetched_clip
+
+        # 사전 생성된 AI 이미지가 있으면 Ken Burns 적용
         if prefetched_img is not None:
             direction = random.choice(["zoom_in", "zoom_out", "pan_right", "pan_left"])
             return self._ken_burns(np.array(prefetched_img), duration, direction=direction)
@@ -381,22 +506,63 @@ class AIVideoGenerator:
     # Wan2.1 ──────────────────────────────────────────────────────────────────
 
     def _bg_wan2(self, scene, script, fmt, duration):
-        prompt = self._build_prompt(scene, script, fmt, for_video=True)
-        try:
-            print(f"      🤖 Wan2.1 clip ({duration:.0f}s)…")
-            result = fal_client.subscribe(
-                "fal-ai/wan/v2.1/1.3b/text-to-video",
-                arguments={
-                    "prompt": prompt,
-                    "aspect_ratio": "9:16",
-                    "num_frames": min(81, max(17, int(duration * 16))),
-                },
-            )
-            url = result["video"]["url"]
-            return self._url_to_clip(url, duration)
-        except Exception as e:
-            print(f"      ⚠️  Wan2.1 실패 ({e}) → Flux")
-            return self._bg_flux(scene, script, fmt, duration)
+        prompt     = self._wan2_prompt(scene, script, fmt)
+        num_frames = min(81, max(17, int(duration * FPS * 0.5)))  # ~15fps 기준
+
+        # 14B 시도 → 1.3B 폴백 (품질 우선)
+        for model_id in (
+            "fal-ai/wan/v2.1/14b/text-to-video",
+            "fal-ai/wan/v2.1/1.3b/text-to-video",
+        ):
+            try:
+                label = model_id.split("/")[-2]
+                print(f"      🤖 Wan2.1-{label} ({duration:.0f}s, {num_frames}f)…")
+                result = fal_client.subscribe(
+                    model_id,
+                    arguments={
+                        "prompt":      prompt,
+                        "aspect_ratio": "9:16",
+                        "num_frames":  num_frames,
+                    },
+                )
+                url = result["video"]["url"]
+                return self._url_to_clip(url, duration)
+            except Exception as e:
+                print(f"      ⚠️  {label} 실패 ({str(e)[:60]})")
+
+        print("      ⚠️  Wan2.1 전체 실패 → Flux")
+        return self._bg_flux(scene, script, fmt, duration)
+
+    def _wan2_prompt(self, scene, script, fmt: str) -> str:
+        """Wan2.1 전용 프롬프트 — 카메라 모션 + 씬 분위기를 구체적으로 기술."""
+        parts: list[str] = []
+
+        # 씬별 모션 (visual_note 우선)
+        vn = getattr(scene, "visual_note", "") or ""
+        if vn in _WAN2_MOTION:
+            parts.append(_WAN2_MOTION[vn])
+        elif fmt in _WAN2_FORMAT_MOTION:
+            parts.append(_WAN2_FORMAT_MOTION[fmt])
+        else:
+            parts.append("slow cinematic camera drift, atmospheric haze, ")
+
+        # 포맷 분위기
+        if fmt in _FORMAT_PROMPTS:
+            parts.append(_FORMAT_PROMPTS[fmt])
+
+        # 색감 강조
+        for ck in ("green", "red", "yellow", "blue", "white"):
+            if ck in vn:
+                parts.append(_COLOR_PROMPTS[ck])
+                break
+        else:
+            color = (getattr(script, "first_frame", None) or {}).get("color", "blue")
+            parts.append(_COLOR_PROMPTS.get(color, ""))
+
+        parts.append("Korean financial market, luxury cinematic aesthetic, ")
+        parts.append(_QUALITY)
+        parts.append(", portrait 9:16 vertical video, no text overlay, no watermarks, no faces")
+        return "".join(parts)
 
     # Flux (fal.ai — 하위 호환용) ─────────────────────────────────────────────
 
