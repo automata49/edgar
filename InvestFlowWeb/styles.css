@@ -1,0 +1,364 @@
+:root {
+  color-scheme: light;
+  --bg: #f3f5f0;
+  --surface: #ffffff;
+  --surface-strong: #101418;
+  --ink: #15191d;
+  --muted: #65706c;
+  --line: #dfe5de;
+  --accent: #176b5b;
+  --accent-2: #c8643b;
+  --ok: #168250;
+  --bad: #bd3d35;
+  --shadow: 0 10px 26px rgba(22, 32, 36, 0.08);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  padding: 0 14px;
+  font-weight: 700;
+}
+
+button.primary,
+.segmented button.selected,
+.status-strip button.selected,
+.bottom-nav button.selected {
+  background: var(--surface-strong);
+  border-color: var(--surface-strong);
+  color: #fff;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  color: var(--ink);
+  padding: 12px;
+  outline: none;
+}
+
+textarea {
+  min-height: 78px;
+  resize: vertical;
+}
+
+textarea.tall {
+  min-height: 140px;
+}
+
+canvas {
+  width: 100%;
+  height: 190px;
+}
+
+.app-shell {
+  width: min(100%, 560px);
+  min-height: 100svh;
+  margin: 0 auto;
+  padding: env(safe-area-inset-top) 0 calc(82px + env(safe-area-inset-bottom));
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 18px 10px;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+.top-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.lang-switch button {
+  min-width: 38px;
+  padding: 0 8px;
+}
+
+.eyebrow {
+  margin: 0 0 2px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(1.75rem, 8vw, 2.5rem);
+  line-height: 1;
+}
+
+h2 {
+  font-size: 1.05rem;
+}
+
+main {
+  padding: 8px 14px 18px;
+}
+
+.screen {
+  display: none;
+}
+
+.screen.active {
+  display: grid;
+  gap: 12px;
+}
+
+.card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.hero-card {
+  background: var(--surface-strong);
+  color: #fff;
+}
+
+.hero-card span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.9rem;
+}
+
+.hero-card strong {
+  display: block;
+  font-size: clamp(2.2rem, 12vw, 4rem);
+  line-height: 0.95;
+  letter-spacing: 0;
+}
+
+.metric-grid,
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.form-grid {
+  grid-template-columns: 1fr 0.8fr;
+}
+
+.metric-grid div {
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.metric-grid small {
+  display: block;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.metric-grid b {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.card-title-row,
+.button-row,
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.button-row {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f4f6f2;
+}
+
+.segmented button {
+  min-height: 34px;
+  border: 0;
+  padding: 0 10px;
+  background: transparent;
+  font-size: 0.86rem;
+}
+
+.full {
+  width: 100%;
+}
+
+.list,
+.idea-list {
+  display: grid;
+  gap: 8px;
+}
+
+.list-item,
+.idea-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.list-item {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.gain {
+  color: var(--ok);
+}
+
+.loss {
+  color: var(--bad);
+}
+
+.checklist-card label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 36px;
+}
+
+input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+progress {
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 99px;
+}
+
+progress::-webkit-progress-bar {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+progress::-webkit-progress-value {
+  background: var(--accent-2);
+}
+
+.status-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 0 2px 2px;
+}
+
+.status-strip button {
+  white-space: nowrap;
+  min-height: 38px;
+}
+
+.idea-card {
+  background: var(--surface);
+}
+
+.idea-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.idea-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.proposal {
+  padding: 10px;
+  border-radius: 8px;
+  background: #edf5f1;
+  border: 1px solid #cfe2d9;
+}
+
+.bottom-nav {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: min(100%, 560px);
+  margin: 0 auto;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  border-top: 1px solid var(--line);
+  backdrop-filter: blur(18px);
+}
+
+.bottom-nav button {
+  min-width: 0;
+}
+
+@media (max-width: 390px) {
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid,
+  .card-title-row {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+}

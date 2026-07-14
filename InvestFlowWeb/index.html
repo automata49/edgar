@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#101418">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Invest Flow">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Invest Flow</title>
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Invest Flow</p>
+          <h1 id="screen-title">Money</h1>
+        </div>
+        <div class="top-actions">
+          <div class="segmented lang-switch" role="group" aria-label="Language">
+            <button id="lang-en" class="selected" data-lang="en" type="button">EN</button>
+            <button id="lang-ko" data-lang="ko" type="button">KR</button>
+          </div>
+          <button id="reset-demo" class="icon-button" type="button" aria-label="Reset demo data" title="Reset demo data">↺</button>
+        </div>
+      </header>
+
+      <main>
+        <section id="money-screen" class="screen active" aria-labelledby="money-tab">
+          <article class="card hero-card">
+            <span data-i18n="investableThisMonth">Investable this month</span>
+            <strong id="investable">$0</strong>
+            <div class="metric-grid">
+              <div><small data-i18n="income">Income</small><b id="income-total">$0</b></div>
+              <div><small data-i18n="expenses">Expenses</small><b id="expense-total">$0</b></div>
+              <div><small data-i18n="allocated">Allocated</small><b id="allocation-total">$0</b></div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-title-row">
+              <h2 data-i18n="quickCashFlow">Quick cash flow</h2>
+              <div class="segmented" role="group" aria-label="Cash flow type">
+                <button class="selected" data-kind="income" data-i18n="income" type="button">Income</button>
+                <button data-kind="expense" data-i18n="expense" type="button">Expense</button>
+              </div>
+            </div>
+            <div class="form-grid">
+              <input id="cash-title" data-i18n-placeholder="label" placeholder="Label" autocomplete="off">
+              <input id="cash-amount" data-i18n-placeholder="amount" inputmode="decimal" type="number" min="0" step="1" placeholder="Amount">
+            </div>
+            <div class="button-row">
+              <button id="add-cash" class="primary" data-i18n="addEntry" type="button">Add entry</button>
+              <button id="quick-income" data-i18n="paycheck" type="button">+ Paycheck</button>
+              <button id="quick-expense" data-i18n="bill" type="button">- Bill</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <h2 data-i18n="recurringAllocation">Recurring allocation</h2>
+            <div class="form-grid">
+              <input id="allocation-symbol" data-i18n-placeholder="symbol" placeholder="Symbol" autocapitalize="characters">
+              <input id="allocation-amount" data-i18n-placeholder="monthly" inputmode="decimal" type="number" min="0" step="1" placeholder="Monthly">
+            </div>
+            <button id="add-allocation" class="primary full" data-i18n="addToPlan" type="button">Add to plan</button>
+            <div id="allocation-list" class="list"></div>
+          </article>
+
+          <article class="card">
+            <h2 data-i18n="cashFlowMix">Cash-flow mix</h2>
+            <canvas id="cash-chart" width="640" height="260" aria-label="Cash flow chart"></canvas>
+          </article>
+        </section>
+
+        <section id="routine-screen" class="screen" aria-labelledby="routine-tab">
+          <article class="card hero-card">
+            <span data-i18n="routineCompletion">Routine completion</span>
+            <strong id="routine-count">0 of 9</strong>
+            <progress id="routine-progress" max="9" value="0"></progress>
+          </article>
+
+          <article class="card checklist-card">
+            <h2 data-i18n="morning">Morning</h2>
+            <label><input type="checkbox" data-routine="morningMarketRead"> <span data-i18n="readMarketTone">Read market tone</span></label>
+            <label><input type="checkbox" data-routine="morningCashCheck"> <span data-i18n="checkCash">Check cash available</span></label>
+            <label><input type="checkbox" data-routine="morningWatchlistReview"> <span data-i18n="reviewWatchlist">Review watchlist</span></label>
+          </article>
+
+          <article class="card checklist-card">
+            <h2 data-i18n="intraday">Intraday</h2>
+            <label><input type="checkbox" data-routine="intradayPriceAlerts"> <span data-i18n="checkAlerts">Check alerts only</span></label>
+            <label><input type="checkbox" data-routine="intradayContrarianCheck"> <span data-i18n="answerContrarian">Answer contrarian prompts</span></label>
+            <label><input type="checkbox" data-routine="intradayNoFomoCheck"> <span data-i18n="noFomo">No-FOMO confirmation</span></label>
+          </article>
+
+          <article class="card">
+            <h2 data-i18n="contrarianQuestions">Pre-trade contrarian questions</h2>
+            <textarea data-routine-text="contrarianOne" data-i18n-placeholder="wrongThesis" placeholder="What would make this thesis wrong?"></textarea>
+            <textarea data-routine-text="contrarianTwo" data-i18n-placeholder="otherSide" placeholder="Who is on the other side of this trade?"></textarea>
+            <textarea data-routine-text="contrarianThree" data-i18n-placeholder="waitPrice" placeholder="What price would make me wait?"></textarea>
+          </article>
+
+          <article class="card checklist-card">
+            <h2 data-i18n="evening">Evening</h2>
+            <label><input type="checkbox" data-routine="eveningJournal"> <span data-i18n="writeReview">Write review</span></label>
+            <label><input type="checkbox" data-routine="eveningAllocationReview"> <span data-i18n="reviewAllocationDrift">Review allocation drift</span></label>
+            <label><input type="checkbox" data-routine="eveningTomorrowPlan"> <span data-i18n="tomorrowPlan">Set tomorrow plan</span></label>
+          </article>
+
+          <article class="card">
+            <h2 data-i18n="dailyReviewNotes">Daily review notes</h2>
+            <textarea data-routine-text="dailyReviewNotes" class="tall" data-i18n-placeholder="learnToday" placeholder="What did I learn today?"></textarea>
+          </article>
+        </section>
+
+        <section id="postit-screen" class="screen" aria-labelledby="postit-tab">
+          <article class="card">
+            <div class="card-title-row">
+              <h2 data-i18n="capture">Capture</h2>
+              <div class="segmented" role="group" aria-label="Asset type">
+                <button class="selected" data-asset="stock" data-i18n="stock" type="button">Stock</button>
+                <button data-asset="crypto" data-i18n="crypto" type="button">Crypto</button>
+              </div>
+            </div>
+            <input id="idea-title" data-i18n-placeholder="ideaTitle" placeholder="Idea title" autocomplete="off">
+            <input id="idea-symbol" data-i18n-placeholder="symbol" placeholder="Symbol" autocapitalize="characters" autocomplete="off">
+            <textarea id="idea-note" data-i18n-placeholder="textNote" placeholder="Text note"></textarea>
+            <div class="button-row">
+              <button id="save-idea" class="primary" data-i18n="saveText" type="button">Save text</button>
+              <button id="voice-idea" data-i18n="voiceNote" type="button">Voice note</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <h2 data-i18n="mockMarketData">Mock market data</h2>
+            <div id="quote-list" class="list"></div>
+          </article>
+
+          <div class="status-strip" role="tablist" aria-label="Idea status">
+            <button class="selected" data-status="Inbox" type="button">Inbox</button>
+            <button data-status="Watch" type="button">Watch</button>
+            <button data-status="Candidate" type="button">Candidate</button>
+            <button data-status="Rejected" type="button">Rejected</button>
+            <button data-status="Portfolio" type="button">Portfolio</button>
+          </div>
+
+          <div id="idea-list" class="idea-list"></div>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="Primary">
+        <button id="money-tab" class="selected" data-screen="money" type="button">Money</button>
+        <button id="routine-tab" data-screen="routine" type="button">Routine</button>
+        <button id="postit-tab" data-screen="postit" type="button">Post-it</button>
+      </nav>
+    </div>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>
