@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 
 from supabase import Client, create_client
 
@@ -106,6 +107,32 @@ class SupabaseDB:
             .execute()
         )
         return result.data[0] if result.data else None
+
+    # ── Invest Flow ─────────────────────────────────────────────────────────
+
+    def get_invest_flow_state(self, family_id: str = "family") -> dict | None:
+        result = (
+            self.client.table("invest_flow_states")
+            .select("family_id,payload,updated_at")
+            .eq("family_id", family_id)
+            .limit(1)
+            .execute()
+        )
+        return result.data[0] if result.data else None
+
+    def save_invest_flow_state(self, payload: dict[str, Any], family_id: str = "family") -> dict:
+        now = datetime.now(timezone.utc).isoformat()
+        row = {
+            "family_id": family_id,
+            "payload": payload,
+            "updated_at": now,
+        }
+        result = (
+            self.client.table("invest_flow_states")
+            .upsert(row, on_conflict="family_id")
+            .execute()
+        )
+        return result.data[0] if result.data else row
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

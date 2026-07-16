@@ -132,3 +132,15 @@ CREATE TABLE IF NOT EXISTS published_videos (
 );
 CREATE INDEX IF NOT EXISTS idx_published_platform ON published_videos (platform);
 CREATE INDEX IF NOT EXISTS idx_published_at        ON published_videos (published_at DESC);
+
+-- =============================================
+-- Invest Flow 가족 공유 상태
+-- =============================================
+
+CREATE TABLE IF NOT EXISTS invest_flow_states (
+    family_id  text PRIMARY KEY,
+    payload    jsonb       NOT NULL DEFAULT '{}'::jsonb,
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_invest_flow_states_updated
+    ON invest_flow_states (updated_at DESC);

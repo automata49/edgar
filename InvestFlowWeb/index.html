@@ -23,6 +23,10 @@
             <button id="lang-en" class="selected" data-lang="en" type="button">EN</button>
             <button id="lang-ko" data-lang="ko" type="button">KR</button>
           </div>
+          <div class="segmented currency-switch" role="group" aria-label="Currency">
+            <button id="currency-krw" class="selected" data-currency="KRW" type="button">KRW</button>
+            <button id="currency-usd" data-currency="USD" type="button">USD</button>
+          </div>
           <button id="reset-demo" class="icon-button" type="button" aria-label="Reset demo data" title="Reset demo data">↺</button>
         </div>
       </header>
@@ -37,6 +41,38 @@
               <div><small data-i18n="expenses">Expenses</small><b id="expense-total">$0</b></div>
               <div><small data-i18n="allocated">Allocated</small><b id="allocation-total">$0</b></div>
             </div>
+          </article>
+
+          <article class="card">
+            <div class="card-title-row">
+              <h2 data-i18n="budgetRuleTitle">50-30-20 budget</h2>
+              <span class="muted" data-i18n="budgetRuleSubtitle">Needs · Wants · Future</span>
+            </div>
+            <div id="budget-summary" class="budget-summary"></div>
+            <div id="bucket-detail" class="detail-list"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-title-row">
+              <h2 data-i18n="monthlyOverview">Monthly overview</h2>
+              <span class="muted" id="monthly-current">-</span>
+            </div>
+            <div id="monthly-list" class="monthly-list"></div>
+          </article>
+
+          <article class="card">
+            <h2 data-i18n="statementAnalyzer">Bank/card paste analyzer</h2>
+            <label class="file-picker">
+              <span data-i18n="uploadStatement">Upload Excel/CSV</span>
+              <input id="statement-file" type="file" accept=".xls,.xlsx,.csv,.tsv,.txt,.html">
+            </label>
+            <p class="muted" data-i18n="uploadHint">Excel upload supports Hana Bank exports when the spreadsheet parser is available.</p>
+            <textarea id="statement-input" class="tall" data-i18n-placeholder="statementPlaceholder" placeholder="Paste bank or card history here."></textarea>
+            <div class="button-row">
+              <button id="analyze-statement" class="primary" data-i18n="analyzeStatement" type="button">Analyze 50-30-20</button>
+              <button id="import-analysis" data-i18n="addAnalyzedToMoney" type="button">Add to Money</button>
+            </div>
+            <div id="analysis-result" class="analysis-list"></div>
           </article>
 
           <article class="card">
@@ -148,6 +184,31 @@
 
           <div id="idea-list" class="idea-list"></div>
         </section>
+
+        <section id="review-screen" class="screen" aria-labelledby="screen-title">
+          <article class="card hero-card">
+            <span data-i18n="reviewSubtitle">Review classified transactions</span>
+            <strong id="review-count">0</strong>
+            <div class="metric-grid">
+              <div><small data-i18n="income">Income</small><b id="review-income">0</b></div>
+              <div><small data-i18n="expenses">Expenses</small><b id="review-expenses">0</b></div>
+              <div><small data-i18n="transfer">Transfer</small><b id="review-excluded">0</b></div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-title-row">
+              <h2 data-i18n="reviewTitle">Classification review</h2>
+              <button id="review-back" type="button" data-i18n="backToMoney">Back</button>
+            </div>
+            <div class="button-row">
+              <button id="review-confirm" class="primary" type="button" data-i18n="confirmImport">Confirm to Money</button>
+              <button id="review-include-all" type="button" data-i18n="includeAll">Include all</button>
+              <button id="review-exclude-transfers" type="button" data-i18n="excludeTransfers">Exclude transfers</button>
+            </div>
+            <div id="review-list" class="review-list"></div>
+          </article>
+        </section>
       </main>
 
       <nav class="bottom-nav" aria-label="Primary">
@@ -157,6 +218,7 @@
       </nav>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="./app.js" type="module"></script>
   </body>
 </html>

@@ -18,7 +18,7 @@ CONFIG: dict = {
 
     # ── Supabase ─────────────────────────────────────────────
     "supabase_url": os.getenv("SUPABASE_URL"),
-    "supabase_key": os.getenv("SUPABASE_KEY"),
+    "supabase_key": os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY"),
 
     # ── LLM ──────────────────────────────────────────────────
     "llm_provider":  os.getenv("LLM_PROVIDER", "deepseek"),
