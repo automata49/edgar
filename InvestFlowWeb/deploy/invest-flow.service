@@ -8,7 +8,6 @@ Type=simple
 WorkingDirectory=/home/ubuntu/edgar
 EnvironmentFile=-/home/ubuntu/edgar/.env
 Environment=INVEST_FLOW_PORT=8081
-Environment=INVEST_FLOW_MARKET_REFRESH_SECONDS=900
 ExecStart=/usr/bin/python3 /home/ubuntu/edgar/InvestFlowWeb/server.py
 Restart=always
 RestartSec=5

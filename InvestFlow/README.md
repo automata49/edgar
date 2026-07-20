@@ -31,15 +31,19 @@ python3 InvestFlowWeb/server.py
 
 Open `http://localhost:8080` on a device or simulator browser. For a physical iPhone, serve it from a host address reachable on the same network.
 
-`InvestFlowWeb/server.py` serves the web app, refreshes Edgar market ticker data in the background, and proxies DeepSeek requests so API keys are not exposed in mobile Chrome. Set `DEEPSEEK_API_KEY` before starting the server.
+`InvestFlowWeb/server.py` serves the web app and Supabase-backed Invest Flow
+state. Heavy market, LLM, YouTube, and PDF jobs stay with the existing Telegram
+bot backend.
 
 ```bash
-export DEEPSEEK_API_KEY=...
-export INVEST_FLOW_MARKET_REFRESH_SECONDS=900
+export SUPABASE_URL=...
+export SUPABASE_KEY=...
 python3 InvestFlowWeb/server.py
 ```
 
-iOS Chrome cannot keep JavaScript running in the background for 24 hours. Keep the Python server running on a Mac, NAS, VPS, or always-on machine; the mobile app reconnects to its `/api/market` and `/api/deepseek` endpoints.
+iOS Chrome cannot keep JavaScript running in the background for 24 hours. Keep
+heavy 24-hour automation in the Telegram bot backend; Invest Flow only loads and
+saves lightweight app state.
 
 ## Oracle Cloud Deployment
 
@@ -75,22 +79,27 @@ server and is never exposed to iPad Chrome.
 
 ## Shared iPad/iPhone Chrome Deployment
 
-For the simplest shared setup, deploy the repository to Vercel and reuse the
-existing Edgar Supabase project.
+For the simplest shared setup, deploy the web frontend to Vercel, reuse the
+existing Edgar Supabase project, and keep Oracle running the current Telegram
+bot as-is.
 
 Invest Flow stores the shared family app state in the `invest_flow_states`
 table defined in `database/schema.sql`. Run the updated schema in the existing
 Supabase SQL Editor before deploying.
 
+Oracle owns yfinance market data, PDF/AI/LLM work, YouTube API calls, Telegram
+bot work, and heavy Supabase writes. Invest Flow does not call those jobs.
+
+Vercel owns the UI and Invest Flow family state lookup.
 Vercel environment variables:
 
 ```bash
 SUPABASE_URL=...
 SUPABASE_KEY=...
-DEEPSEEK_API_KEY=...
 ```
 
 `SUPABASE_ANON_KEY` also works if that is the key name you use in Vercel.
+Vercel installs the light dependency set from `requirements-vercel.txt`.
 
 After deployment, open the same family URL on both devices:
 
@@ -101,3 +110,5 @@ https://YOUR_VERCEL_APP.vercel.app/?family=YOUR_FAMILY_CODE
 Both iPad and iPhone Chrome will read and write the same Supabase-backed Invest
 Flow state. If the `family` query parameter is omitted, the app uses `family` as
 the default shared code.
+
+Detailed deployment steps live in `docs/investflow-light-deployment.md`.

@@ -305,31 +305,12 @@ const financeAnalysisService = {
 
 const aiService = {
   async summarize(idea) {
-    const backendSummary = await this.summarizeWithDeepSeek(idea).catch(() => "");
-    if (backendSummary) return backendSummary;
-
     const quote = marketService.quote(idea.symbol);
     const t = copy();
     if (state.language === "ko") {
       return `${t.thesis}: ${idea.note || t.noNoteYet} ${quote.symbol} ${t.mockedAt} ${money(quote.price, "USD")}, ${quote.change.toFixed(1)}% ${t.dayMove}. ${t.checkDownside}`;
     }
     return `${t.thesis}: ${idea.note || t.noNoteYet} ${quote.symbol} ${t.mockedAt} ${money(quote.price, "USD")} with a ${quote.change.toFixed(1)}% ${t.dayMove}. ${t.checkDownside}`;
-  },
-  async summarizeWithDeepSeek(idea) {
-    const quote = marketService.quote(idea.symbol);
-    const response = await fetch("./api/deepseek", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: [{
-          role: "user",
-          content: `Analyze this investment Post-it. Symbol: ${idea.symbol}. Asset: ${idea.asset}. Note: ${idea.note}. Market: ${quote.price} (${quote.change}%).`
-        }]
-      })
-    });
-    if (!response.ok) return "";
-    const payload = await response.json();
-    return payload.answer || "";
   },
   propose(idea, investable) {
     const weight = idea.asset === "crypto" ? 0.08 : 0.12;

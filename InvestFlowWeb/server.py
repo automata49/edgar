@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Invest Flow web server with Edgar market data and DeepSeek proxy.
+"""Lightweight Invest Flow web server.
 
 Run from the repository root:
     python3 InvestFlowWeb/server.py
 
-The browser app stays lightweight. This process owns 24-hour refresh work and
-keeps API keys out of mobile Chrome.
+This server is only for static hosting and Supabase-backed Invest Flow state.
+Heavy yfinance, LLM, YouTube, and PDF jobs remain Telegram-bot-only.
 """
 
 from __future__ import annotations
@@ -13,22 +13,14 @@ from __future__ import annotations
 import json
 import os
 import sys
-import threading
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WEB_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
-
-try:
-    from collectors.market_data_collector import MarketDataCollector
-except Exception:  # pragma: no cover - runtime fallback
-    MarketDataCollector = None
 
 try:
     from config import CONFIG as EDGAR_CONFIG
@@ -40,71 +32,14 @@ try:
 except Exception:  # pragma: no cover - runtime fallback
     SupabaseDB = None
 
-PORT = int(os.getenv("INVEST_FLOW_PORT", "8080"))
-REFRESH_SECONDS = int(os.getenv("INVEST_FLOW_MARKET_REFRESH_SECONDS", "900"))
+PORT = int(os.getenv("PORT") or os.getenv("INVEST_FLOW_PORT", "8080"))
 
-MARKET_CACHE: dict[str, dict] = {
-    "updated_at": None,
-    "data": {},
-    "status": "starting",
-}
-
-FALLBACK_MARKET_DATA = {
+LIGHTWEIGHT_MARKET_DATA = {
     "SPY": {"price": 0, "change": 0, "change_percent": 0, "previous_close": 0},
     "QQQ": {"price": 0, "change": 0, "change_percent": 0, "previous_close": 0},
-    "KOSPI": {"price": 0, "change": 0, "change_percent": 0, "previous_close": 0},
     "BTC": {"price": 0, "change": 0, "change_percent": 0, "previous_close": 0},
     "ETH": {"price": 0, "change": 0, "change_percent": 0, "previous_close": 0},
 }
-
-
-def collect_market_data() -> dict[str, dict]:
-    if not MarketDataCollector:
-        return FALLBACK_MARKET_DATA
-    collector = MarketDataCollector(EDGAR_CONFIG)
-    data = collector.get_all_market_data()
-    return data or FALLBACK_MARKET_DATA
-
-
-def market_loop() -> None:
-    while True:
-        try:
-            MARKET_CACHE["data"] = collect_market_data()
-            MARKET_CACHE["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-            MARKET_CACHE["status"] = "ok"
-        except Exception as exc:
-            MARKET_CACHE["status"] = f"error: {exc}"
-        time.sleep(REFRESH_SECONDS)
-
-
-def call_deepseek(messages: list[dict], report_context: str = "") -> str:
-    api_key = EDGAR_CONFIG.get("deepseek_api_key") or os.getenv("DEEPSEEK_API_KEY")
-    if not api_key:
-        raise RuntimeError("DEEPSEEK_API_KEY is not configured")
-
-    system_prompt = (
-        "당신은 금융 트렌드 분석 전문가입니다. 최신 시장 데이터와 사용자 메모를 바탕으로 "
-        "간결하고 실행 가능한 투자 검토 메모를 작성하세요.\n\n"
-        f"=== 최신 리포트 ===\n{report_context[:3000] if report_context else '리포트 없음'}"
-    )
-    payload = {
-        "model": "deepseek-chat",
-        "messages": [{"role": "system", "content": system_prompt}, *messages],
-        "temperature": 0.7,
-        "max_tokens": 1000,
-    }
-    request = urllib.request.Request(
-        "https://api.deepseek.com/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=45) as response:
-        body = json.loads(response.read().decode("utf-8"))
-    return body["choices"][0]["message"]["content"]
 
 
 def invest_flow_db() -> SupabaseDB:
@@ -132,10 +67,20 @@ class InvestFlowHandler(SimpleHTTPRequestHandler):
     def do_GET(self) -> None:
         path = urllib.parse.urlparse(self.path)
         if path.path == "/api/market":
-            self.send_json(MARKET_CACHE)
+            self.send_json({
+                "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "data": LIGHTWEIGHT_MARKET_DATA,
+                "status": "mock",
+                "note": "Live market collection is reserved for the Telegram bot backend.",
+            })
             return
         if path.path == "/api/health":
-            self.send_json({"ok": True, "market": MARKET_CACHE["status"]})
+            self.send_json({
+                "ok": True,
+                "mode": "lightweight",
+                "supabase_state": "/api/investflow/state",
+                "heavy_jobs": "telegram-bot-only",
+            })
             return
         if path.path == "/api/investflow/state":
             try:
@@ -156,12 +101,11 @@ class InvestFlowHandler(SimpleHTTPRequestHandler):
     def do_POST(self) -> None:
         path = urllib.parse.urlparse(self.path)
         if path.path == "/api/deepseek":
-            try:
-                payload = self.read_json_body()
-                answer = call_deepseek(payload.get("messages", []), payload.get("report_context", ""))
-                self.send_json({"answer": answer})
-            except (urllib.error.URLError, RuntimeError, KeyError, json.JSONDecodeError) as exc:
-                self.send_json({"error": str(exc)}, status=502)
+            self.send_json({
+                "answer": "",
+                "status": "disabled",
+                "note": "LLM processing is reserved for the Telegram bot backend.",
+            })
             return
         if path.path == "/api/investflow/state":
             try:
@@ -194,10 +138,9 @@ class InvestFlowHandler(SimpleHTTPRequestHandler):
 
 
 def main() -> None:
-    threading.Thread(target=market_loop, daemon=True).start()
     server = ThreadingHTTPServer(("0.0.0.0", PORT), InvestFlowHandler)
     print(f"Invest Flow server: http://0.0.0.0:{PORT}")
-    print(f"Market refresh: every {REFRESH_SECONDS}s")
+    print("Mode: lightweight static + Supabase state")
     server.serve_forever()
 
 

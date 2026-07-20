@@ -1,25 +1,17 @@
 from __future__ import annotations
 
 import json
-import time
 from http.server import BaseHTTPRequestHandler
-
-
-LIGHTWEIGHT_MARKET_DATA = {
-    "SPY": {"price": 0, "change": 0, "change_percent": 0, "previous_close": 0},
-    "QQQ": {"price": 0, "change": 0, "change_percent": 0, "previous_close": 0},
-    "BTC": {"price": 0, "change": 0, "change_percent": 0, "previous_close": 0},
-    "ETH": {"price": 0, "change": 0, "change_percent": 0, "previous_close": 0},
-}
 
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         self.send_json({
-            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "data": LIGHTWEIGHT_MARKET_DATA,
-            "status": "mock",
-            "note": "Live market collection is reserved for the Telegram bot backend.",
+            "ok": True,
+            "frontend": "vercel",
+            "mode": "lightweight",
+            "supabase_state": "/api/investflow/state",
+            "heavy_jobs": "telegram-bot-only",
         })
 
     def send_json(self, payload: dict, status: int = 200) -> None:

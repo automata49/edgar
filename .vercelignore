@@ -1,0 +1,39 @@
+.git
+.claude
+.devcontainer
+.vscode
+venv
+venv/
+venv_backup
+venv_backup/
+__pycache__
+**/__pycache__
+*.pyc
+.env
+requirements.txt
+config.py
+shared
+database
+
+# Native app and local banking data are not needed for the web deployment.
+InvestFlow/InvestFlow.xcodeproj
+InvestFlow/InvestFlow
+InvestFlow/data
+data
+InvestFlowWeb/server.py
+InvestFlowWeb/deploy
+
+# Edgar Telegram-bot-only backend code stays off Vercel.
+analyzers
+collectors
+kstock_signal
+reporters
+telegram_bot
+bot.py
+monitoring_bot.py
+openclaw_bot.py
+scheduler.py
+scheduler.py.save
+
+# Generated/reference docs are not needed for the web runtime.
+docs
