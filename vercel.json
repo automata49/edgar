@@ -1,5 +1,4 @@
 {
-  "installCommand": "python3 -m pip install -r requirements-vercel.txt",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/", "destination": "/InvestFlowWeb/index.html" },
