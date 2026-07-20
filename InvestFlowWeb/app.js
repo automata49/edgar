@@ -37,10 +37,10 @@ const i18n = {
     addToPlan: "Add to plan",
     cashFlowMix: "Cash-flow mix",
     budgetRuleTitle: "50-30-20 budget",
-    budgetRuleSubtitle: "Needs · Wants · Future",
+    budgetRuleSubtitle: "Needs · Wants · Investments",
     needs: "Needs",
     wants: "Wants",
-    future: "Future",
+    future: "Investments",
     target: "Target",
     actual: "Actual",
     statementAnalyzer: "Bank/card paste analyzer",
@@ -84,7 +84,7 @@ const i18n = {
     analysisWait: "Wait for DeepSeek validation to finish before confirming.",
     essentialReason: "Essential living cost",
     discretionaryReason: "Flexible lifestyle spend",
-    investingReason: "Future, debt, savings, or investment",
+    investingReason: "Debt repayment, savings, or investments",
     incomeReason: "Detected income or deposit",
     transfer: "Transfer",
     transferReason: "Internal transfer excluded from 50-30-20 totals",
@@ -165,7 +165,7 @@ const i18n = {
     addToPlan: "계획에 추가",
     cashFlowMix: "현금흐름 구성",
     budgetRuleTitle: "50-30-20 예산",
-    budgetRuleSubtitle: "필수 · 선택 · 미래",
+    budgetRuleSubtitle: "필수 · 선택 · 투자",
     needs: "필수",
     wants: "선택",
     future: "투자",
@@ -212,7 +212,7 @@ const i18n = {
     analysisWait: "DeepSeek 검증이 끝난 후 Money에 확정해 주세요.",
     essentialReason: "생계유지에 필요한 필수 지출",
     discretionaryReason: "삶의 질을 위한 선택 지출",
-    investingReason: "비상금, 부채상환, 투자 등 미래 지출",
+    investingReason: "비상금, 부채상환, 저축 및 투자",
     incomeReason: "수입 또는 입금으로 감지",
     transfer: "이체",
     transferReason: "50-30-20 합계에서 제외되는 내부 이체",
@@ -1657,5 +1657,5 @@ setInterval(() => {
 }, 300000);
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=12").then((registration) => registration.update()).catch(() => {});
+  navigator.serviceWorker.register("./sw.js?v=13").then((registration) => registration.update()).catch(() => {});
 }
