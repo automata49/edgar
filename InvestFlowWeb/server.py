@@ -45,6 +45,10 @@ LIGHTWEIGHT_MARKET_DATA = {
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
 ALLOWED_KINDS = {"income", "expense", "transfer"}
 ALLOWED_BUCKETS = {"essential", "discretionary", "investing", "income", "transfer"}
+ALLOWED_EXPENSE_CATEGORIES = {
+    "groceries", "utilities", "fuel_transport", "housing", "healthcare", "insurance", "education", "loan_interest",
+    "dining", "shopping", "entertainment", "travel", "subscriptions", "savings_investments", "debt_principal", "other",
+}
 
 
 def clean_transaction(item: dict) -> dict:
@@ -56,6 +60,7 @@ def clean_transaction(item: dict) -> dict:
         "amount": abs(float(item.get("amount") or 0)),
         "kind": kind,
         "bucket": bucket,
+        "expenseCategory": item.get("expenseCategory") if item.get("expenseCategory") in ALLOWED_EXPENSE_CATEGORIES else "other",
         "currency": "USD" if item.get("currency") == "USD" else "KRW",
         "date": str(item.get("date") or "")[:10],
         "institution": str(item.get("institution") or "Manual paste")[:80],
@@ -69,8 +74,9 @@ def call_deepseek_validator(transactions: list[dict], existing: list[dict]) -> d
         raise RuntimeError("DEEPSEEK_API_KEY is not configured")
     model = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
     prompt = f"""Validate Korean/English bank and card transactions for a 50-30-20 budget.
-Return JSON only: {{"transactions":[{{"id":"input id","title":"merchant","amount":123,"date":"YYYY-MM-DD","kind":"income|expense|transfer","bucket":"essential|discretionary|investing|income|transfer","reason":"short reason","duplicate":false}}]}}.
+Return JSON only: {{"transactions":[{{"id":"input id","title":"merchant","amount":123,"date":"YYYY-MM-DD","kind":"income|expense|transfer","bucket":"essential|discretionary|investing|income|transfer","expenseCategory":"category code","reason":"short reason","duplicate":false}}]}}.
 Keep every unique input id exactly once. Mark duplicate=true for repeated transactions within input or transactions already present in existing_transactions. A duplicate requires the same real-world transaction (date, amount, merchant/institution and direction); similar recurring purchases on different dates are not duplicates. Correct obvious merchant/date/type/category parsing errors, but never invent a transaction or change a plausible amount. Internal account transfers and card-bill payments are transfer. Income uses income bucket; transfer uses transfer bucket. Housing, utilities, groceries, medical, insurance, transit and necessary education are essential. Lifestyle, dining, shopping, entertainment and travel are discretionary. Savings, debt principal and securities purchases are investing.
+For every expense choose exactly one expenseCategory: groceries (food ingredients/supermarkets), utilities (electricity/gas/water/management fees), fuel_transport (fuel/transit/taxi/tolls), housing, healthcare, insurance, education, loan_interest, dining, shopping, entertainment, travel, subscriptions, savings_investments, debt_principal, or other. Loan interest is an essential expense; debt principal is investing. For income/transfer use other.
 INPUT={json.dumps(transactions, ensure_ascii=False)}
 EXISTING_TRANSACTIONS={json.dumps(existing, ensure_ascii=False)}"""
     request_body = json.dumps({
@@ -126,6 +132,7 @@ def normalize_deepseek_result(originals: list[dict], result: dict) -> list[dict]
             "date": date,
             "kind": kind,
             "bucket": bucket,
+            "expenseCategory": proposed.get("expenseCategory") if kind == "expense" and proposed.get("expenseCategory") in ALLOWED_EXPENSE_CATEGORIES else original["expenseCategory"],
             "reason": str(proposed.get("reason") or "DeepSeek verified")[:180],
             "included": kind != "transfer",
         })

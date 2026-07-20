@@ -1,6 +1,10 @@
 const STORAGE_KEY = "invest-flow-web-v1";
 const FAMILY_KEY = "invest-flow-family-id";
 const STATUSES = ["Inbox", "Watch", "Candidate", "Rejected", "Portfolio"];
+const EXPENSE_CATEGORIES = [
+  "groceries", "utilities", "fuel_transport", "housing", "healthcare", "insurance", "education", "loan_interest",
+  "dining", "shopping", "entertainment", "travel", "subscriptions", "savings_investments", "debt_principal", "other"
+];
 const urlParams = new URLSearchParams(window.location.search);
 const familyId = urlParams.get("family") || localStorage.getItem(FAMILY_KEY) || "family";
 localStorage.setItem(FAMILY_KEY, familyId);
@@ -36,6 +40,10 @@ const i18n = {
     monthly: "Monthly",
     addToPlan: "Add to plan",
     cashFlowMix: "Cash-flow mix",
+    expenseChart: "Expense chart",
+    expenseChartSubtitle: "Spending by detailed category",
+    expenseCategory: "Expense category",
+    noExpenseData: "No expenses for this month.",
     budgetRuleTitle: "50-30-20 budget",
     budgetRuleSubtitle: "Needs · Wants · Investments",
     needs: "Needs",
@@ -138,6 +146,12 @@ const i18n = {
       Candidate: "Candidate",
       Rejected: "Rejected",
       Portfolio: "Portfolio"
+    },
+    expenseCategories: {
+      groceries: "Groceries", utilities: "Utilities & electricity", fuel_transport: "Fuel & transport", housing: "Housing",
+      healthcare: "Healthcare", insurance: "Insurance", education: "Education", loan_interest: "Loan interest",
+      dining: "Dining & cafes", shopping: "Shopping", entertainment: "Entertainment", travel: "Travel",
+      subscriptions: "Subscriptions", savings_investments: "Savings & investments", debt_principal: "Debt principal", other: "Other"
     }
   },
   ko: {
@@ -164,6 +178,10 @@ const i18n = {
     monthly: "월 금액",
     addToPlan: "계획에 추가",
     cashFlowMix: "현금흐름 구성",
+    expenseChart: "지출 차트",
+    expenseChartSubtitle: "세부 항목별 지출",
+    expenseCategory: "세부 지출 분류",
+    noExpenseData: "이번 달 지출 내역이 없습니다.",
     budgetRuleTitle: "50-30-20 예산",
     budgetRuleSubtitle: "필수 · 선택 · 투자",
     needs: "필수",
@@ -266,6 +284,12 @@ const i18n = {
       Candidate: "후보",
       Rejected: "제외",
       Portfolio: "포트폴리오"
+    },
+    expenseCategories: {
+      groceries: "식료품", utilities: "전기·공과금", fuel_transport: "주유·교통", housing: "주거",
+      healthcare: "의료", insurance: "보험", education: "교육", loan_interest: "대출이자",
+      dining: "외식·카페", shopping: "쇼핑", entertainment: "문화·오락", travel: "여행",
+      subscriptions: "구독", savings_investments: "저축·투자", debt_principal: "대출원금", other: "기타"
     }
   }
 };
@@ -333,6 +357,7 @@ const financeAnalysisService = {
       amount,
       kind,
       bucket,
+      expenseCategory: kind === "expense" ? classifyExpenseCategory(line, bucket) : "other",
       currency,
       date,
       institution: hana?.institution ?? detectInstitution(line),
@@ -438,7 +463,10 @@ function normalizeState(parsed) {
     ...entry,
     currency: entry.currency ?? inferLegacyCurrency(entry.amount, entry.title),
     date: extractDate(String(entry.date ?? "")),
-    bucket: entry.bucket ?? (entry.kind === "income" ? "income" : classifyBucket(entry.title ?? ""))
+    bucket: entry.bucket ?? (entry.kind === "income" ? "income" : classifyBucket(entry.title ?? "")),
+    expenseCategory: EXPENSE_CATEGORIES.includes(entry.expenseCategory)
+      ? entry.expenseCategory
+      : classifyExpenseCategory(`${entry.title ?? ""} ${entry.raw ?? ""}`, entry.bucket)
   }));
   if (!parsed.legacySeedDataRemoved) {
     parsed.entries = parsed.entries.filter((entry) => !isLegacySeedEntry(entry));
@@ -625,7 +653,8 @@ function classifyHanaBucket(type, memo, branch, isExpense) {
   if (/키움증권|증권|주식|펀드|etf|isa|연금|irp|투자/.test(text)) {
     return isExpense ? "investing" : "transfer";
   }
-  if (/대출상환|대출이자|대출결산이자|상환/.test(text)) return "investing";
+  if (/대출이자|대출결산이자|이자납입/.test(text)) return "essential";
+  if (/대출상환|원금상환|상환/.test(text)) return "investing";
   if (/국민카드|신한카드|삼성카드|현대카드|하나카드/.test(text)) return isExpense ? "discretionary" : "transfer";
   if (/김용/.test(memo) && /송금|이체|대체/.test(type)) return "transfer";
   if (!isExpense) return "income";
@@ -702,6 +731,7 @@ function detectInstitution(line) {
 
 function classifyBucket(line) {
   const text = line.toLowerCase();
+  if (/대출이자|대출결산이자|이자납입|loan interest|interest payment/.test(text)) return "essential";
   if (/증권|주식|펀드|etf|isa|연금|퇴직|irp|저축|적금|예금|대출상환|카드대금|상환|비상금|투자|brokerage|stock|fund|saving|loan|debt|retire/.test(text)) {
     return "investing";
   }
@@ -715,6 +745,31 @@ function classifyBucket(line) {
   }
 
   return "discretionary";
+}
+
+function classifyExpenseCategory(line, bucket = "discretionary") {
+  const text = String(line).toLowerCase();
+  if (/식료|마트|슈퍼|농협|정육|과일|채소|grocery|supermarket/.test(text)) return "groceries";
+  if (/전기|전력|가스|수도|공과금|관리비|utility|electric|water bill/.test(text)) return "utilities";
+  if (/주유|충전소|휘발유|경유|교통|버스|지하철|택시|톨게이트|fuel|gas station|transport|subway|taxi/.test(text)) return "fuel_transport";
+  if (/월세|전세|임대|주택|아파트|rent|housing|mortgage/.test(text)) return "housing";
+  if (/병원|의원|치과|약국|의료|건강|hospital|clinic|dental|pharmacy|medical/.test(text)) return "healthcare";
+  if (/보험|insurance/.test(text)) return "insurance";
+  if (/교육|학원|학교|대학교|등록금|교재|education|academy|tuition|school/.test(text)) return "education";
+  if (/대출이자|이자납입|loan interest|interest payment/.test(text)) return "loan_interest";
+  if (/대출상환|원금상환|loan principal|debt principal/.test(text)) return "debt_principal";
+  if (/저축|적금|예금|증권|주식|펀드|etf|isa|연금|irp|투자|saving|brokerage|stock|fund|investment/.test(text)) return "savings_investments";
+  if (/외식|식당|카페|커피|배달|배민|요기요|restaurant|dining|cafe|coffee|delivery/.test(text)) return "dining";
+  if (/쇼핑|쿠팡|의류|백화점|마켓플레이스|shopping|clothing|mall/.test(text)) return "shopping";
+  if (/영화|게임|공연|취미|넷플릭스|디즈니|entertainment|movie|game|hobby/.test(text)) return "entertainment";
+  if (/여행|호텔|항공|숙박|travel|hotel|airline|flight/.test(text)) return "travel";
+  if (/구독|정기결제|subscription|membership/.test(text)) return "subscriptions";
+  if (bucket === "investing") return "savings_investments";
+  return "other";
+}
+
+function expenseCategoryLabel(category) {
+  return copy().expenseCategories[category] ?? copy().expenseCategories.other;
 }
 
 function totals() {
@@ -749,6 +804,7 @@ function render() {
   renderRoutine();
   renderPostIt();
   renderReview();
+  renderExpenseChart();
   saveState();
 }
 
@@ -775,14 +831,15 @@ function renderI18n() {
 
 function renderTabs() {
   const t = copy();
-  const title = t[state.activeScreen] ?? t.postit;
+  const title = state.activeScreen === "expense" ? t.expenseChart : (t[state.activeScreen] ?? t.postit);
   $("#screen-title").textContent = title;
 
   $$(".screen").forEach((screen) => screen.classList.remove("active"));
   $(`#${state.activeScreen}-screen`).classList.add("active");
 
   $$(".bottom-nav button").forEach((button) => {
-    button.classList.toggle("selected", button.dataset.screen === state.activeScreen);
+    const selectedScreen = state.activeScreen === "expense" ? "money" : state.activeScreen;
+    button.classList.toggle("selected", button.dataset.screen === selectedScreen);
     button.textContent = t[button.dataset.screen] ?? button.textContent;
   });
 }
@@ -913,7 +970,7 @@ function renderAnalysisResult() {
     <div class="analysis-item">
       <div>
         <strong>${escapeHtml(item.title)}</strong>
-        <div class="muted">${escapeHtml(item.institution)} · ${bucketLabel(item.bucket)} · ${escapeHtml(item.reason)}</div>
+        <div class="muted">${escapeHtml(item.institution)} · ${bucketLabel(item.bucket)} · ${item.kind === "expense" ? `${expenseCategoryLabel(item.expenseCategory)} · ` : ""}${escapeHtml(item.reason)}</div>
       </div>
       <b>${item.kind === "income" ? "+" : item.kind === "transfer" ? "" : "-"}${money(item.amount, item.currency)}</b>
     </div>
@@ -946,6 +1003,9 @@ function reviewItemTemplate(item) {
   const kindOptions = ["expense", "income", "transfer"]
     .map((kind) => `<option value="${kind}" ${item.kind === kind ? "selected" : ""}>${bucketLabel(kind)}</option>`)
     .join("");
+  const expenseCategoryOptions = EXPENSE_CATEGORIES
+    .map((category) => `<option value="${category}" ${item.expenseCategory === category ? "selected" : ""}>${expenseCategoryLabel(category)}</option>`)
+    .join("");
 
   return `
     <article class="review-item ${item.included ? "" : "is-excluded"}">
@@ -977,6 +1037,10 @@ function reviewItemTemplate(item) {
         <label>
           <span>${copy().classification}</span>
           <select data-review-bucket="${item.id}">${bucketOptions}</select>
+        </label>
+        <label>
+          <span>${copy().expenseCategory}</span>
+          <select data-review-expense-category="${item.id}" ${item.kind === "expense" ? "" : "disabled"}>${expenseCategoryOptions}</select>
         </label>
         <button class="danger-button" data-review-delete="${item.id}" type="button">${copy().deleteTransaction}</button>
       </div>
@@ -1027,6 +1091,7 @@ async function validateWithDeepSeek(items) {
     amount: entry.amount,
     kind: entry.kind,
     bucket: entry.bucket,
+    expenseCategory: entry.expenseCategory,
     currency: entry.currency,
     date: entry.date,
     institution: entry.source || "Manual entry",
@@ -1078,6 +1143,9 @@ async function analyzeStatementText(text) {
     statementValidationInProgress = false;
     state.pendingImports = verified.transactions.map((item) => ({
       ...item,
+      expenseCategory: EXPENSE_CATEGORIES.includes(item.expenseCategory)
+        ? item.expenseCategory
+        : classifyExpenseCategory(`${item.title} ${item.raw}`, item.bucket),
       reason: item.reason || reasonForBucket(item.bucket),
       included: item.kind !== "transfer"
     }));
@@ -1111,6 +1179,7 @@ function importAnalyzedTransactions(items) {
       amount: item.amount,
       kind: item.kind,
       bucket: item.bucket,
+      expenseCategory: item.expenseCategory,
       currency: item.currency,
       date: item.date ?? todayKey(),
       recurring: false,
@@ -1202,6 +1271,47 @@ function drawCashChart(income, expenses, allocated) {
     context.fillStyle = "#15191d";
     context.fillText(label, x, 226);
     context.fillText(money(value), x, 34);
+  });
+}
+
+function renderExpenseChart() {
+  const expenseEntries = currentCurrencyEntries().filter((entry) => entry.kind === "expense" && formatMonth(entry.date));
+  const month = expenseEntries.map((entry) => formatMonth(entry.date)).sort().reverse()[0] ?? todayKey().slice(0, 7);
+  const rows = EXPENSE_CATEGORIES.map((category) => ({
+    category,
+    amount: expenseEntries
+      .filter((entry) => formatMonth(entry.date) === month && entry.expenseCategory === category)
+      .reduce((sum, entry) => sum + Number(entry.amount), 0)
+  })).filter((row) => row.amount > 0).sort((a, b) => b.amount - a.amount);
+  const total = rows.reduce((sum, row) => sum + row.amount, 0);
+  $("#expense-chart-total").textContent = money(total);
+  $("#expense-chart-month").textContent = month;
+  $("#expense-category-list").innerHTML = rows.length ? rows.map((row) => `
+    <div class="category-item">
+      <span>${escapeHtml(expenseCategoryLabel(row.category))}</span>
+      <strong>${money(row.amount)}</strong>
+      <span class="muted">${total ? Math.round((row.amount / total) * 100) : 0}%</span>
+    </div>
+  `).join("") : `<p class="muted">${copy().noExpenseData}</p>`;
+  drawExpenseCategoryChart(rows);
+}
+
+function drawExpenseCategoryChart(rows) {
+  const canvas = $("#expense-category-chart");
+  const context = canvas.getContext("2d");
+  const colors = ["#176b5b", "#334f7d", "#c8643b", "#8b6f47", "#6d5b8c", "#2f7c8f", "#9a5261", "#68734d"];
+  const max = Math.max(...rows.map((row) => row.amount), 1);
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.font = "20px system-ui";
+  rows.slice(0, 8).forEach((row, index) => {
+    const y = 24 + index * 61;
+    const width = Math.max(4, (row.amount / max) * 310);
+    context.fillStyle = "#15191d";
+    context.fillText(expenseCategoryLabel(row.category), 18, y + 18);
+    context.fillStyle = colors[index % colors.length];
+    context.fillRect(205, y, width, 28);
+    context.fillStyle = "#15191d";
+    context.fillText(money(row.amount), 205, y + 50);
   });
 }
 
@@ -1344,6 +1454,16 @@ function bindEvents() {
     render();
   });
 
+  $("#open-expense-chart").addEventListener("click", () => {
+    state.activeScreen = "expense";
+    render();
+  });
+
+  $("#expense-back").addEventListener("click", () => {
+    state.activeScreen = "money";
+    render();
+  });
+
   $("#reset-current-month").addEventListener("click", () => {
     const month = todayKey().slice(0, 7);
     const count = state.entries.filter((entry) => formatMonth(entry.date) === month).length;
@@ -1450,7 +1570,8 @@ function bindEvents() {
     const titleId = event.target.dataset.reviewTitle;
     const dateId = event.target.dataset.reviewDate;
     const amountId = event.target.dataset.reviewAmount;
-    const id = includeId || kindId || bucketId || titleId || dateId || amountId;
+    const expenseCategoryId = event.target.dataset.reviewExpenseCategory;
+    const id = includeId || kindId || bucketId || titleId || dateId || amountId || expenseCategoryId;
     if (!id) return;
 
     const item = state.pendingImports.find((candidate) => candidate.id === id);
@@ -1464,6 +1585,9 @@ function bindEvents() {
       if (item.kind === "income") item.bucket = "income";
       if (item.kind === "transfer") item.bucket = "transfer";
       if (item.kind === "expense" && ["income", "transfer"].includes(item.bucket)) item.bucket = "discretionary";
+      if (item.kind === "expense" && !EXPENSE_CATEGORIES.includes(item.expenseCategory)) {
+        item.expenseCategory = classifyExpenseCategory(`${item.title} ${item.raw}`, item.bucket);
+      }
     }
     if (bucketId) {
       item.bucket = event.target.value;
@@ -1477,6 +1601,7 @@ function bindEvents() {
       const amount = Number(event.target.value);
       if (amount > 0) item.amount = amount;
     }
+    if (expenseCategoryId) item.expenseCategory = event.target.value;
     item.reason = reasonForBucket(item.bucket);
     render();
   });
@@ -1599,6 +1724,7 @@ function addEntry(title, amount, kind, bucket = null) {
     currency: state.currency,
     date: todayKey(),
     bucket: bucket ?? (kind === "income" ? "income" : classifyBucket(title)),
+    expenseCategory: kind === "expense" ? classifyExpenseCategory(title, bucket ?? classifyBucket(title)) : "other",
     recurring: true
   });
   render();
@@ -1657,5 +1783,5 @@ setInterval(() => {
 }, 300000);
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=13").then((registration) => registration.update()).catch(() => {});
+  navigator.serviceWorker.register("./sw.js?v=14").then((registration) => registration.update()).catch(() => {});
 }

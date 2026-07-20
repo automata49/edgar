@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Invest Flow</title>
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=13">
+    <link rel="stylesheet" href="./styles.css?v=14">
   </head>
   <body>
     <div id="app" class="app-shell">
@@ -50,6 +50,7 @@
             </div>
             <div id="budget-summary" class="budget-summary"></div>
             <div id="bucket-detail" class="detail-list"></div>
+            <button id="open-expense-chart" class="full" data-i18n="expenseChart" type="button">Expense chart</button>
           </article>
 
           <article class="card">
@@ -216,6 +217,24 @@
             <div id="review-list" class="review-list"></div>
           </article>
         </section>
+
+        <section id="expense-screen" class="screen" aria-labelledby="screen-title">
+          <article class="card hero-card">
+            <span data-i18n="expenseChartSubtitle">Spending by detailed category</span>
+            <strong id="expense-chart-total">0</strong>
+          </article>
+          <article class="card">
+            <div class="card-title-row">
+              <div>
+                <h2 data-i18n="expenseChart">Expense chart</h2>
+                <span id="expense-chart-month" class="muted"></span>
+              </div>
+              <button id="expense-back" data-i18n="backToMoney" type="button">Back</button>
+            </div>
+            <canvas id="expense-category-chart" width="640" height="520" aria-label="Expense chart"></canvas>
+            <div id="expense-category-list" class="category-list"></div>
+          </article>
+        </section>
       </main>
 
       <nav class="bottom-nav" aria-label="Primary">
@@ -226,6 +245,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="./app.js?v=13" type="module"></script>
+    <script src="./app.js?v=14" type="module"></script>
   </body>
 </html>
