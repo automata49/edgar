@@ -9,6 +9,7 @@ let suppressRemoteSave = false;
 let remoteUpdatedAt = "";
 let remoteSaveTimer = null;
 let statementAnalysisRun = 0;
+let statementValidationInProgress = false;
 
 const i18n = {
   en: {
@@ -78,6 +79,7 @@ const i18n = {
     analysisImported: (count) => `${count} transactions added to Money.`,
     analysisAutoImported: (count, skipped) => `${count} transactions added to Money automatically. ${skipped} duplicates skipped.`,
     analysisNoReady: "Analyze transactions before adding.",
+    analysisWait: "Wait for DeepSeek validation to finish before confirming.",
     essentialReason: "Essential living cost",
     discretionaryReason: "Flexible lifestyle spend",
     investingReason: "Future, debt, savings, or investment",
@@ -203,6 +205,7 @@ const i18n = {
     analysisImported: (count) => `${count}건을 Money에 추가했습니다.`,
     analysisAutoImported: (count, skipped) => `${count}건을 자동으로 Money에 추가했습니다. 중복 ${skipped}건은 제외했습니다.`,
     analysisNoReady: "추가하기 전에 먼저 분석해 주세요.",
+    analysisWait: "DeepSeek 검증이 끝난 후 Money에 확정해 주세요.",
     essentialReason: "생계유지에 필요한 필수 지출",
     discretionaryReason: "삶의 질을 위한 선택 지출",
     investingReason: "비상금, 부채상환, 투자 등 미래 지출",
@@ -902,6 +905,10 @@ function renderReview() {
   $("#review-income").textContent = money(income);
   $("#review-expenses").textContent = money(expenses);
   $("#review-excluded").textContent = String(excluded);
+  $("#review-analysis-status").textContent = state.analysisMessage || "";
+  $("#review-analysis-status").classList.toggle("is-loading", statementValidationInProgress);
+  $("#review-confirm").disabled = statementValidationInProgress || !items.length;
+  $("#review-confirm").setAttribute("aria-busy", String(statementValidationInProgress));
   $("#review-list").innerHTML = items.length ? items.map(reviewItemTemplate).join("") : `<p class="muted">${copy().analysisEmpty}</p>`;
 }
 
@@ -1013,6 +1020,7 @@ async function validateWithDeepSeek(items) {
 async function analyzeStatementText(text) {
   const runId = ++statementAnalysisRun;
   if (!text) {
+    statementValidationInProgress = false;
     state.pendingImports = [];
     state.analysisMessage = copy().analysisEmpty;
     render();
@@ -1025,11 +1033,13 @@ async function analyzeStatementText(text) {
   }));
   const localResult = deterministicDeduplicate(locallyAnalyzed);
   state.pendingImports = localResult.unique;
+  statementValidationInProgress = state.pendingImports.length > 0;
   state.analysisMessage = copy().analysisValidating(state.pendingImports.length);
   state.activeScreen = "review";
   render();
 
   if (!state.pendingImports.length) {
+    statementValidationInProgress = false;
     state.analysisMessage = copy().analysisVerified(0, localResult.duplicates);
     render();
     return;
@@ -1038,6 +1048,7 @@ async function analyzeStatementText(text) {
   try {
     const verified = await validateWithDeepSeek(state.pendingImports);
     if (runId !== statementAnalysisRun) return;
+    statementValidationInProgress = false;
     state.pendingImports = verified.transactions.map((item) => ({
       ...item,
       reason: item.reason || reasonForBucket(item.bucket),
@@ -1049,6 +1060,7 @@ async function analyzeStatementText(text) {
     );
   } catch {
     if (runId !== statementAnalysisRun) return;
+    statementValidationInProgress = false;
     state.analysisMessage = copy().analysisLocalFallback(state.pendingImports.length, localResult.duplicates);
   }
   render();
@@ -1315,6 +1327,7 @@ function bindEvents() {
     }
     if (!window.confirm(copy().resetCurrentMonthConfirm(month, count))) return;
     statementAnalysisRun += 1;
+    statementValidationInProgress = false;
     state.entries = state.entries.filter((entry) => formatMonth(entry.date) !== month);
     state.pendingImports = [];
     state.analysisMessage = copy().resetCurrentMonthDone(month, count);
@@ -1359,6 +1372,11 @@ function bindEvents() {
   });
 
   $("#review-confirm").addEventListener("click", () => {
+    if (statementValidationInProgress) {
+      state.analysisMessage = copy().analysisWait;
+      render();
+      return;
+    }
     if (!state.pendingImports.length) {
       state.analysisMessage = copy().analysisNoReady;
       state.activeScreen = "money";
@@ -1603,5 +1621,5 @@ setInterval(() => {
 }, 300000);
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=10").then((registration) => registration.update()).catch(() => {});
+  navigator.serviceWorker.register("./sw.js?v=11").then((registration) => registration.update()).catch(() => {});
 }
