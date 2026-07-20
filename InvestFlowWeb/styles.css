@@ -294,6 +294,22 @@ main {
   align-items: center;
 }
 
+.allocation-item {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.allocation-item label {
+  display: grid;
+  gap: 4px;
+}
+
 .analysis-item {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -553,6 +569,7 @@ progress::-webkit-progress-value {
   .form-grid,
   .card-title-row,
   .review-controls,
+  .allocation-item,
   .monthly-item {
     grid-template-columns: 1fr;
     display: grid;

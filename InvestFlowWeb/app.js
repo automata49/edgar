@@ -27,6 +27,10 @@ const i18n = {
     paycheck: "+ Paycheck",
     bill: "- Bill",
     recurringAllocation: "Recurring allocation",
+    resetAllocations: "Reset allocations",
+    resetAllocationsConfirm: (currency, count) => `Delete all ${count} recurring ${currency} allocations? This cannot be undone.`,
+    resetAllocationsEmpty: (currency) => `There are no ${currency} allocations to reset.`,
+    deleteAllocation: "Delete",
     symbol: "Symbol",
     monthly: "Monthly",
     addToPlan: "Add to plan",
@@ -148,6 +152,10 @@ const i18n = {
     paycheck: "+ 월급",
     bill: "- 고정비",
     recurringAllocation: "반복 투자 배분",
+    resetAllocations: "배분 전체 리셋",
+    resetAllocationsConfirm: (currency, count) => `${currency} 반복 배분 ${count}건을 모두 삭제할까요? 삭제 후에는 되돌릴 수 없습니다.`,
+    resetAllocationsEmpty: (currency) => `리셋할 ${currency} 반복 배분이 없습니다.`,
+    deleteAllocation: "삭제",
     symbol: "심볼",
     monthly: "월 금액",
     addToPlan: "계획에 추가",
@@ -764,9 +772,16 @@ function renderMoney() {
   });
 
   $("#allocation-list").innerHTML = state.allocations.filter((allocation) => (allocation.currency ?? state.currency) === state.currency).map((allocation) => `
-    <div class="list-item">
-      <div><strong>${escapeHtml(allocation.symbol)}</strong><div class="muted">${copy().monthlyRecurring}</div></div>
-      <strong>${money(allocation.amount, allocation.currency)}</strong>
+    <div class="allocation-item">
+      <label>
+        <span class="muted">${copy().symbol}</span>
+        <input data-allocation-symbol="${allocation.id}" value="${escapeHtml(allocation.symbol)}" autocapitalize="characters">
+      </label>
+      <label>
+        <span class="muted">${copy().monthly}</span>
+        <input data-allocation-amount="${allocation.id}" type="number" min="1" step="1" inputmode="decimal" value="${Number(allocation.amount)}">
+      </label>
+      <button class="danger-button compact" data-allocation-delete="${allocation.id}" type="button">${copy().deleteAllocation}</button>
     </div>
   `).join("");
 
@@ -1430,6 +1445,40 @@ function bindEvents() {
     render();
   });
 
+  $("#reset-allocations").addEventListener("click", () => {
+    const currency = state.currency;
+    const count = state.allocations.filter((allocation) => (allocation.currency ?? currency) === currency).length;
+    if (!count) {
+      window.alert(copy().resetAllocationsEmpty(currency));
+      return;
+    }
+    if (!window.confirm(copy().resetAllocationsConfirm(currency, count))) return;
+    state.allocations = state.allocations.filter((allocation) => (allocation.currency ?? currency) !== currency);
+    render();
+  });
+
+  $("#allocation-list").addEventListener("change", (event) => {
+    const symbolId = event.target.dataset.allocationSymbol;
+    const amountId = event.target.dataset.allocationAmount;
+    const id = symbolId || amountId;
+    if (!id) return;
+    const allocation = state.allocations.find((item) => item.id === id);
+    if (!allocation) return;
+    if (symbolId) allocation.symbol = event.target.value.trim().toUpperCase() || allocation.symbol;
+    if (amountId) {
+      const amount = Number(event.target.value);
+      if (amount > 0) allocation.amount = amount;
+    }
+    render();
+  });
+
+  $("#allocation-list").addEventListener("click", (event) => {
+    const id = event.target.dataset.allocationDelete;
+    if (!id) return;
+    state.allocations = state.allocations.filter((allocation) => allocation.id !== id);
+    render();
+  });
+
   $$("[data-routine]").forEach((input) => {
     input.addEventListener("change", () => {
       state.routine[input.dataset.routine] = input.checked;
@@ -1554,5 +1603,5 @@ setInterval(() => {
 }, 300000);
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js");
+  navigator.serviceWorker.register("./sw.js?v=10").then((registration) => registration.update()).catch(() => {});
 }

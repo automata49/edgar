@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Invest Flow</title>
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./styles.css?v=10">
   </head>
   <body>
     <div id="app" class="app-shell">
@@ -98,7 +98,10 @@
           </article>
 
           <article class="card">
-            <h2 data-i18n="recurringAllocation">Recurring allocation</h2>
+            <div class="card-title-row">
+              <h2 data-i18n="recurringAllocation">Recurring allocation</h2>
+              <button id="reset-allocations" class="danger-button compact" data-i18n="resetAllocations" type="button">Reset allocations</button>
+            </div>
             <div class="form-grid">
               <input id="allocation-symbol" data-i18n-placeholder="symbol" placeholder="Symbol" autocapitalize="characters">
               <input id="allocation-amount" data-i18n-placeholder="monthly" inputmode="decimal" type="number" min="0" step="1" placeholder="Monthly">
@@ -222,6 +225,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="./app.js" type="module"></script>
+    <script src="./app.js?v=10" type="module"></script>
   </body>
 </html>
