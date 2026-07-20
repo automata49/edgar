@@ -452,7 +452,42 @@ main {
 }
 
 .monthly-item {
-  grid-template-columns: 1fr auto auto auto auto;
+  grid-template-columns: 1fr auto auto auto;
+}
+
+.monthly-row-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.classification-edit-title {
+  margin-top: 8px;
+}
+
+.monthly-classification-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.monthly-classification-item > div {
+  display: grid;
+  gap: 3px;
+}
+
+.monthly-classification-item select {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
 }
 
 .muted {
@@ -615,6 +650,7 @@ progress::-webkit-progress-value {
   .card-title-row,
   .review-controls,
   .allocation-item,
+  .monthly-classification-item,
   .monthly-item {
     grid-template-columns: 1fr;
     display: grid;

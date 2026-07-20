@@ -70,12 +70,21 @@ export default async function handler(request, response) {
     const body = typeof request.body === "string" ? JSON.parse(request.body || "{}") : request.body || {};
     const transactions = (Array.isArray(body.transactions) ? body.transactions : []).slice(0, 150).map(cleanTransaction).filter((item) => item.id && item.amount > 0);
     const existing = (Array.isArray(body.existing_transactions) ? body.existing_transactions : []).slice(0, 500).map(cleanTransaction);
+    const classificationRules = (Array.isArray(body.classification_rules) ? body.classification_rules : []).slice(0, 200)
+      .filter((rule) => ALLOWED_BUCKETS.has(rule?.bucket) && ALLOWED_EXPENSE_CATEGORIES.has(rule?.expenseCategory))
+      .map((rule) => ({
+        title: String(rule.title || "").slice(0, 120),
+        bucket: rule.bucket,
+        expenseCategory: rule.expenseCategory
+      }));
     if (!transactions.length) return response.status(400).json({ error: "No valid transactions" });
 
     const prompt = `Validate Korean/English bank and card transactions for a 50-30-20 budget.
 Return JSON only: {"transactions":[{"id":"input id","title":"merchant","amount":123,"date":"YYYY-MM-DD","kind":"income|expense|transfer","bucket":"essential|discretionary|investing|income|transfer","expenseCategory":"category code","reason":"short reason","duplicate":false}]}.
 Keep every unique input id exactly once. Mark duplicate=true for repeated transactions within input or transactions already present in existing_transactions. A duplicate requires the same real-world transaction (date, amount, merchant/institution and direction); similar recurring purchases on different dates are not duplicates. Correct obvious merchant/date/type/category parsing errors, but never invent a transaction or change a plausible amount. Internal account transfers and card-bill payments are transfer. Income uses income bucket; transfer uses transfer bucket. Housing, utilities, groceries, medical, insurance, transit and necessary education are essential. Lifestyle, dining, shopping, entertainment and travel are discretionary. Savings, debt principal and securities purchases are investing.
 For every expense choose exactly one expenseCategory: groceries (food ingredients/supermarkets), utilities (electricity/gas/water/management fees), fuel_transport (fuel/transit/taxi/tolls), housing, healthcare, insurance, education, loan_interest, dining, shopping, entertainment, travel, subscriptions, savings_investments, debt_principal, or other. Loan interest is an essential expense; debt principal is investing. For income/transfer use other.
+USER_CLASSIFICATION_RULES are prior explicit corrections and have priority when the merchant/title clearly matches. Do not apply a rule to an unrelated merchant.
+USER_CLASSIFICATION_RULES=${JSON.stringify(classificationRules)}
 INPUT=${JSON.stringify(transactions)}
 EXISTING_TRANSACTIONS=${JSON.stringify(existing)}`;
 

@@ -44,6 +44,9 @@ const i18n = {
     expenseChartSubtitle: "Spending by detailed category",
     expenseCategory: "Expense category",
     noExpenseData: "No expenses for this month.",
+    editClassifications: "Edit classifications",
+    editMonthlyClassifications: "Edit monthly classifications",
+    classificationLearningHint: "Corrections are reused for future transactions.",
     budgetRuleTitle: "50-30-20 budget",
     budgetRuleSubtitle: "Needs · Wants · Investments",
     needs: "Needs",
@@ -182,6 +185,9 @@ const i18n = {
     expenseChartSubtitle: "세부 항목별 지출",
     expenseCategory: "세부 지출 분류",
     noExpenseData: "이번 달 지출 내역이 없습니다.",
+    editClassifications: "분류 수정",
+    editMonthlyClassifications: "월 거래 분류 수정",
+    classificationLearningHint: "수정한 분류는 이후 같은 거래의 자동 분류에 반영됩니다.",
     budgetRuleTitle: "50-30-20 예산",
     budgetRuleSubtitle: "필수 · 선택 · 투자",
     needs: "필수",
@@ -392,6 +398,7 @@ const defaultState = () => ({
   language: "en",
   currency: "KRW",
   selectedBucket: "essential",
+  selectedExpenseMonth: "",
   cashKind: "income",
   assetKind: "stock",
   ideaStatus: "Inbox",
@@ -399,6 +406,7 @@ const defaultState = () => ({
   allocations: [],
   pendingImports: [],
   analysisMessage: "",
+  classificationRules: [],
   routineDate: todayKey(),
   routine: {
     morningMarketRead: false,
@@ -459,6 +467,8 @@ function normalizeState(parsed) {
   parsed.selectedBucket = parsed.selectedBucket ?? "essential";
   parsed.pendingImports = parsed.pendingImports ?? [];
   parsed.analysisMessage = parsed.analysisMessage ?? "";
+  parsed.selectedExpenseMonth = parsed.selectedExpenseMonth ?? "";
+  parsed.classificationRules = Array.isArray(parsed.classificationRules) ? parsed.classificationRules.slice(0, 200) : [];
   parsed.entries = (parsed.entries ?? []).map((entry) => ({
     ...entry,
     currency: entry.currency ?? inferLegacyCurrency(entry.amount, entry.title),
@@ -772,6 +782,37 @@ function expenseCategoryLabel(category) {
   return copy().expenseCategories[category] ?? copy().expenseCategories.other;
 }
 
+function classificationRuleKey(title) {
+  return String(title || "").toLowerCase().replace(/[^0-9a-z가-힣]/g, "").slice(0, 80);
+}
+
+function applyLearnedClassification(item) {
+  const key = classificationRuleKey(item.title);
+  const rule = state.classificationRules.find((candidate) => candidate.key === key);
+  if (!rule) return item;
+  return {
+    ...item,
+    kind: "expense",
+    bucket: rule.bucket,
+    expenseCategory: rule.expenseCategory,
+    reason: state.language === "ko" ? "사용자 수정 분류 반영" : "Applied learned user classification"
+  };
+}
+
+function rememberClassification(item) {
+  if (item.kind !== "expense") return;
+  const key = classificationRuleKey(item.title);
+  if (!key) return;
+  const rule = {
+    key,
+    title: item.title,
+    bucket: item.bucket,
+    expenseCategory: EXPENSE_CATEGORIES.includes(item.expenseCategory) ? item.expenseCategory : "other",
+    updatedAt: new Date().toISOString()
+  };
+  state.classificationRules = [rule, ...state.classificationRules.filter((candidate) => candidate.key !== key)].slice(0, 200);
+}
+
 function totals() {
   const entries = state.entries.filter((entry) => (entry.currency ?? state.currency) === state.currency);
   const allocations = state.allocations.filter((allocation) => (allocation.currency ?? state.currency) === state.currency);
@@ -936,7 +977,10 @@ function renderMonthlyOverview() {
       <span class="gain">+${money(row.income)}</span>
       <span class="loss">-${money(row.expenses)}</span>
       <b>${money(row.income - row.expenses)}</b>
-      <button class="danger-button compact" data-reset-month="${row.month}" type="button">${copy().resetMonth}</button>
+      <div class="monthly-row-actions">
+        <button class="compact" data-edit-month="${row.month}" type="button">${copy().editClassifications}</button>
+        <button class="danger-button compact" data-reset-month="${row.month}" type="button">${copy().resetMonth}</button>
+      </div>
     </div>
   `).join("") : `<p class="muted">${copy().noItems}</p>`;
 }
@@ -1100,7 +1144,11 @@ async function validateWithDeepSeek(items) {
   const response = await fetch("./api/deepseek", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ transactions: items, existing_transactions: existingTransactions })
+    body: JSON.stringify({
+      transactions: items,
+      existing_transactions: existingTransactions,
+      classification_rules: state.classificationRules
+    })
   });
   const payload = await response.json();
   if (!response.ok || payload.status !== "ok" || !Array.isArray(payload.transactions)) {
@@ -1119,10 +1167,10 @@ async function analyzeStatementText(text) {
     return;
   }
 
-  const locallyAnalyzed = financeAnalysisService.analyze(text).map((item) => ({
-    ...item,
-    included: item.bucket !== "transfer"
-  }));
+  const locallyAnalyzed = financeAnalysisService.analyze(text).map((item) => {
+    const classified = applyLearnedClassification(item);
+    return { ...classified, included: classified.bucket !== "transfer" };
+  });
   const localResult = deterministicDeduplicate(locallyAnalyzed);
   state.pendingImports = localResult.unique;
   statementValidationInProgress = state.pendingImports.length > 0;
@@ -1141,14 +1189,18 @@ async function analyzeStatementText(text) {
     const verified = await validateWithDeepSeek(state.pendingImports);
     if (runId !== statementAnalysisRun) return;
     statementValidationInProgress = false;
-    state.pendingImports = verified.transactions.map((item) => ({
-      ...item,
-      expenseCategory: EXPENSE_CATEGORIES.includes(item.expenseCategory)
-        ? item.expenseCategory
-        : classifyExpenseCategory(`${item.title} ${item.raw}`, item.bucket),
-      reason: item.reason || reasonForBucket(item.bucket),
-      included: item.kind !== "transfer"
-    }));
+    state.pendingImports = verified.transactions.map((item) => {
+      const normalized = {
+        ...item,
+        expenseCategory: EXPENSE_CATEGORIES.includes(item.expenseCategory)
+          ? item.expenseCategory
+          : classifyExpenseCategory(`${item.title} ${item.raw}`, item.bucket),
+        reason: item.reason || reasonForBucket(item.bucket),
+        included: item.kind !== "transfer"
+      };
+      const learned = applyLearnedClassification(normalized);
+      return { ...learned, included: learned.kind !== "transfer" };
+    });
     state.analysisMessage = copy().analysisVerified(
       state.pendingImports.length,
       localResult.duplicates + Number(verified.duplicates_removed || 0)
@@ -1276,7 +1328,11 @@ function drawCashChart(income, expenses, allocated) {
 
 function renderExpenseChart() {
   const expenseEntries = currentCurrencyEntries().filter((entry) => entry.kind === "expense" && formatMonth(entry.date));
-  const month = expenseEntries.map((entry) => formatMonth(entry.date)).sort().reverse()[0] ?? todayKey().slice(0, 7);
+  const availableMonths = expenseEntries.map((entry) => formatMonth(entry.date)).sort().reverse();
+  const month = availableMonths.includes(state.selectedExpenseMonth)
+    ? state.selectedExpenseMonth
+    : (availableMonths[0] ?? todayKey().slice(0, 7));
+  state.selectedExpenseMonth = month;
   const rows = EXPENSE_CATEGORIES.map((category) => ({
     category,
     amount: expenseEntries
@@ -1293,7 +1349,27 @@ function renderExpenseChart() {
       <span class="muted">${total ? Math.round((row.amount / total) * 100) : 0}%</span>
     </div>
   `).join("") : `<p class="muted">${copy().noExpenseData}</p>`;
+  const monthEntries = expenseEntries
+    .filter((entry) => formatMonth(entry.date) === month)
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  $("#monthly-classification-list").innerHTML = monthEntries.length ? monthEntries.map(monthlyClassificationTemplate).join("") : `<p class="muted">${copy().noExpenseData}</p>`;
   drawExpenseCategoryChart(rows);
+}
+
+function monthlyClassificationTemplate(entry) {
+  const bucketOptions = ["essential", "discretionary", "investing"]
+    .map((bucket) => `<option value="${bucket}" ${entry.bucket === bucket ? "selected" : ""}>${bucketLabel(bucket)}</option>`)
+    .join("");
+  const categoryOptions = EXPENSE_CATEGORIES
+    .map((category) => `<option value="${category}" ${entry.expenseCategory === category ? "selected" : ""}>${expenseCategoryLabel(category)}</option>`)
+    .join("");
+  return `
+    <article class="monthly-classification-item">
+      <div><strong>${escapeHtml(entry.title)}</strong><span class="muted">${escapeHtml(entry.date)} · ${money(entry.amount, entry.currency)}</span></div>
+      <select data-entry-bucket="${entry.id}" aria-label="${copy().classification}">${bucketOptions}</select>
+      <select data-entry-expense-category="${entry.id}" aria-label="${copy().expenseCategory}">${categoryOptions}</select>
+    </article>
+  `;
 }
 
 function drawExpenseCategoryChart(rows) {
@@ -1484,6 +1560,13 @@ function bindEvents() {
   });
 
   $("#monthly-list").addEventListener("click", (event) => {
+    const editMonth = event.target.dataset.editMonth;
+    if (editMonth) {
+      state.selectedExpenseMonth = editMonth;
+      state.activeScreen = "expense";
+      render();
+      return;
+    }
     const month = event.target.dataset.resetMonth;
     if (!month) return;
     const count = state.entries.filter((entry) => formatMonth(entry.date) === month).length;
@@ -1602,7 +1685,21 @@ function bindEvents() {
       if (amount > 0) item.amount = amount;
     }
     if (expenseCategoryId) item.expenseCategory = event.target.value;
+    if (bucketId || expenseCategoryId) rememberClassification(item);
     item.reason = reasonForBucket(item.bucket);
+    render();
+  });
+
+  $("#monthly-classification-list").addEventListener("change", (event) => {
+    const bucketId = event.target.dataset.entryBucket;
+    const categoryId = event.target.dataset.entryExpenseCategory;
+    const id = bucketId || categoryId;
+    if (!id) return;
+    const entry = state.entries.find((item) => item.id === id);
+    if (!entry) return;
+    if (bucketId) entry.bucket = event.target.value;
+    if (categoryId) entry.expenseCategory = event.target.value;
+    rememberClassification(entry);
     render();
   });
 
@@ -1783,5 +1880,5 @@ setInterval(() => {
 }, 300000);
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=14").then((registration) => registration.update()).catch(() => {});
+  navigator.serviceWorker.register("./sw.js?v=15").then((registration) => registration.update()).catch(() => {});
 }

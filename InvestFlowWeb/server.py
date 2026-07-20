@@ -68,7 +68,7 @@ def clean_transaction(item: dict) -> dict:
     }
 
 
-def call_deepseek_validator(transactions: list[dict], existing: list[dict]) -> dict:
+def call_deepseek_validator(transactions: list[dict], existing: list[dict], classification_rules: list[dict]) -> dict:
     api_key = os.getenv("DEEPSEEK_API_KEY") or EDGAR_CONFIG.get("deepseek_api_key")
     if not api_key:
         raise RuntimeError("DEEPSEEK_API_KEY is not configured")
@@ -77,6 +77,8 @@ def call_deepseek_validator(transactions: list[dict], existing: list[dict]) -> d
 Return JSON only: {{"transactions":[{{"id":"input id","title":"merchant","amount":123,"date":"YYYY-MM-DD","kind":"income|expense|transfer","bucket":"essential|discretionary|investing|income|transfer","expenseCategory":"category code","reason":"short reason","duplicate":false}}]}}.
 Keep every unique input id exactly once. Mark duplicate=true for repeated transactions within input or transactions already present in existing_transactions. A duplicate requires the same real-world transaction (date, amount, merchant/institution and direction); similar recurring purchases on different dates are not duplicates. Correct obvious merchant/date/type/category parsing errors, but never invent a transaction or change a plausible amount. Internal account transfers and card-bill payments are transfer. Income uses income bucket; transfer uses transfer bucket. Housing, utilities, groceries, medical, insurance, transit and necessary education are essential. Lifestyle, dining, shopping, entertainment and travel are discretionary. Savings, debt principal and securities purchases are investing.
 For every expense choose exactly one expenseCategory: groceries (food ingredients/supermarkets), utilities (electricity/gas/water/management fees), fuel_transport (fuel/transit/taxi/tolls), housing, healthcare, insurance, education, loan_interest, dining, shopping, entertainment, travel, subscriptions, savings_investments, debt_principal, or other. Loan interest is an essential expense; debt principal is investing. For income/transfer use other.
+USER_CLASSIFICATION_RULES are prior explicit corrections and have priority when the merchant/title clearly matches. Do not apply a rule to an unrelated merchant.
+USER_CLASSIFICATION_RULES={json.dumps(classification_rules, ensure_ascii=False)}
 INPUT={json.dumps(transactions, ensure_ascii=False)}
 EXISTING_TRANSACTIONS={json.dumps(existing, ensure_ascii=False)}"""
     request_body = json.dumps({
@@ -204,10 +206,19 @@ class InvestFlowHandler(SimpleHTTPRequestHandler):
                 transactions = [clean_transaction(item) for item in (payload.get("transactions") or [])[:150]]
                 transactions = [item for item in transactions if item["id"] and item["amount"] > 0]
                 existing = [clean_transaction(item) for item in (payload.get("existing_transactions") or [])[:500]]
+                classification_rules = [
+                    {
+                        "title": str(rule.get("title") or "")[:120],
+                        "bucket": rule.get("bucket"),
+                        "expenseCategory": rule.get("expenseCategory"),
+                    }
+                    for rule in (payload.get("classification_rules") or [])[:200]
+                    if rule.get("bucket") in ALLOWED_BUCKETS and rule.get("expenseCategory") in ALLOWED_EXPENSE_CATEGORIES
+                ]
                 if not transactions:
                     self.send_json({"error": "No valid transactions"}, status=400)
                     return
-                deepseek = call_deepseek_validator(transactions, existing)
+                deepseek = call_deepseek_validator(transactions, existing, classification_rules)
                 verified = normalize_deepseek_result(transactions, deepseek["result"])
                 self.send_json({
                     "status": "ok",
