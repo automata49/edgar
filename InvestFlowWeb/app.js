@@ -8,6 +8,7 @@ let remoteReady = false;
 let suppressRemoteSave = false;
 let remoteUpdatedAt = "";
 let remoteSaveTimer = null;
+let statementAnalysisRun = 0;
 
 const i18n = {
   en: {
@@ -57,9 +58,19 @@ const i18n = {
     transactionType: "Type",
     classification: "Classification",
     monthlyOverview: "Monthly overview",
+    resetCurrentMonth: "Reset this month",
+    resetCurrentMonthConfirm: (month, count) => `Delete all ${count} transaction entries for ${month}? Recurring allocations will be kept. This cannot be undone.`,
+    resetCurrentMonthDone: (month, count) => `${count} transaction entries for ${month} were deleted.`,
+    resetCurrentMonthEmpty: (month) => `There are no transaction entries to delete for ${month}.`,
+    transactionName: "Name",
+    transactionDate: "Date",
+    deleteTransaction: "Delete",
     noItems: "No items",
     analysisEmpty: "Paste transaction lines first.",
     analysisReady: (count) => `${count} classified transactions ready.`,
+    analysisValidating: (count) => `DeepSeek is validating and deduplicating ${count} transactions…`,
+    analysisVerified: (count, duplicates) => `DeepSeek verified ${count} transactions. ${duplicates} duplicates removed.`,
+    analysisLocalFallback: (count, duplicates) => `DeepSeek is unavailable; local analysis prepared ${count} transactions and removed ${duplicates} exact duplicates. Please review carefully.`,
     analysisImported: (count) => `${count} transactions added to Money.`,
     analysisAutoImported: (count, skipped) => `${count} transactions added to Money automatically. ${skipped} duplicates skipped.`,
     analysisNoReady: "Analyze transactions before adding.",
@@ -168,9 +179,19 @@ const i18n = {
     transactionType: "입출금",
     classification: "분류",
     monthlyOverview: "월별 요약",
+    resetCurrentMonth: "이번 달 입력 전체 삭제",
+    resetCurrentMonthConfirm: (month, count) => `${month}의 거래 입력 ${count}건을 모두 삭제할까요? 반복 투자 계획은 유지되며, 삭제 후에는 되돌릴 수 없습니다.`,
+    resetCurrentMonthDone: (month, count) => `${month}의 거래 입력 ${count}건을 삭제했습니다.`,
+    resetCurrentMonthEmpty: (month) => `${month}에 삭제할 거래 입력이 없습니다.`,
+    transactionName: "거래명",
+    transactionDate: "날짜",
+    deleteTransaction: "삭제",
     noItems: "항목 없음",
     analysisEmpty: "먼저 거래 내역을 붙여넣어 주세요.",
     analysisReady: (count) => `${count}건의 거래를 분류했습니다.`,
+    analysisValidating: (count) => `DeepSeek가 ${count}건을 검증하고 중복을 제거하는 중입니다…`,
+    analysisVerified: (count, duplicates) => `DeepSeek 검증 완료: ${count}건, 중복 ${duplicates}건 제거.`,
+    analysisLocalFallback: (count, duplicates) => `DeepSeek를 사용할 수 없어 로컬 분석으로 ${count}건을 준비하고 명확한 중복 ${duplicates}건을 제거했습니다. 내용을 확인해 주세요.`,
     analysisImported: (count) => `${count}건을 Money에 추가했습니다.`,
     analysisAutoImported: (count, skipped) => `${count}건을 자동으로 Money에 추가했습니다. 중복 ${skipped}건은 제외했습니다.`,
     analysisNoReady: "추가하기 전에 먼저 분석해 주세요.",
@@ -884,11 +905,22 @@ function reviewItemTemplate(item) {
         <span>${item.included ? copy().included : copy().excluded}</span>
       </label>
       <div class="review-main">
-        <strong>${escapeHtml(item.title)}</strong>
+        <label>
+          <span>${copy().transactionName}</span>
+          <input data-review-title="${item.id}" value="${escapeHtml(item.title)}">
+        </label>
         <span class="muted">${escapeHtml(item.institution)} · ${money(item.amount, item.currency)}</span>
         <span class="muted">${escapeHtml(item.reason)}</span>
       </div>
       <div class="review-controls">
+        <label>
+          <span>${copy().transactionDate}</span>
+          <input type="date" data-review-date="${item.id}" value="${escapeHtml(item.date)}">
+        </label>
+        <label>
+          <span>${copy().amount}</span>
+          <input type="number" min="1" step="1" inputmode="decimal" data-review-amount="${item.id}" value="${Number(item.amount)}">
+        </label>
         <label>
           <span>${copy().transactionType}</span>
           <select data-review-kind="${item.id}">${kindOptions}</select>
@@ -897,12 +929,74 @@ function reviewItemTemplate(item) {
           <span>${copy().classification}</span>
           <select data-review-bucket="${item.id}">${bucketOptions}</select>
         </label>
+        <button class="danger-button" data-review-delete="${item.id}" type="button">${copy().deleteTransaction}</button>
       </div>
     </article>
   `;
 }
 
-function analyzeStatementText(text, autoImport = true) {
+function deterministicDeduplicate(items) {
+  const existingKeys = new Set(state.entries.map(canonicalTransactionKey));
+  const seen = new Set();
+  const unique = [];
+  let duplicates = 0;
+  items.forEach((item) => {
+    const key = canonicalTransactionKey(item);
+    if (seen.has(key) || existingKeys.has(key)) {
+      duplicates += 1;
+      return;
+    }
+    seen.add(key);
+    unique.push(item);
+  });
+  return { unique, duplicates };
+}
+
+function canonicalTransactionKey(item) {
+  const normalizedTitle = String(item.title || "")
+    .toLowerCase()
+    .replace(/[^0-9a-z가-힣]/g, "");
+  return [
+    formatMonthDay(item.date),
+    Number(item.amount || 0).toFixed(2),
+    item.kind,
+    item.currency,
+    normalizedTitle,
+    String(item.institution || "").toLowerCase()
+  ].join("|");
+}
+
+function formatMonthDay(date) {
+  const match = String(date || "").match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  return match ? `${match[1]}-${match[2].padStart(2, "0")}-${match[3].padStart(2, "0")}` : String(date || "");
+}
+
+async function validateWithDeepSeek(items) {
+  const existingTransactions = state.entries.map((entry) => ({
+    id: entry.id,
+    title: entry.title,
+    amount: entry.amount,
+    kind: entry.kind,
+    bucket: entry.bucket,
+    currency: entry.currency,
+    date: entry.date,
+    institution: entry.source || "Manual entry",
+    raw: entry.raw || ""
+  }));
+  const response = await fetch("./api/deepseek", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ transactions: items, existing_transactions: existingTransactions })
+  });
+  const payload = await response.json();
+  if (!response.ok || payload.status !== "ok" || !Array.isArray(payload.transactions)) {
+    throw new Error(payload.error || "DeepSeek validation failed");
+  }
+  return payload;
+}
+
+async function analyzeStatementText(text) {
+  const runId = ++statementAnalysisRun;
   if (!text) {
     state.pendingImports = [];
     state.analysisMessage = copy().analysisEmpty;
@@ -910,12 +1004,38 @@ function analyzeStatementText(text, autoImport = true) {
     return;
   }
 
-  state.pendingImports = financeAnalysisService.analyze(text).map((item) => ({
+  const locallyAnalyzed = financeAnalysisService.analyze(text).map((item) => ({
     ...item,
     included: item.bucket !== "transfer"
   }));
-  state.analysisMessage = copy().analysisReady(state.pendingImports.length);
+  const localResult = deterministicDeduplicate(locallyAnalyzed);
+  state.pendingImports = localResult.unique;
+  state.analysisMessage = copy().analysisValidating(state.pendingImports.length);
   state.activeScreen = "review";
+  render();
+
+  if (!state.pendingImports.length) {
+    state.analysisMessage = copy().analysisVerified(0, localResult.duplicates);
+    render();
+    return;
+  }
+
+  try {
+    const verified = await validateWithDeepSeek(state.pendingImports);
+    if (runId !== statementAnalysisRun) return;
+    state.pendingImports = verified.transactions.map((item) => ({
+      ...item,
+      reason: item.reason || reasonForBucket(item.bucket),
+      included: item.kind !== "transfer"
+    }));
+    state.analysisMessage = copy().analysisVerified(
+      state.pendingImports.length,
+      localResult.duplicates + Number(verified.duplicates_removed || 0)
+    );
+  } catch {
+    if (runId !== statementAnalysisRun) return;
+    state.analysisMessage = copy().analysisLocalFallback(state.pendingImports.length, localResult.duplicates);
+  }
   render();
 }
 
@@ -1170,6 +1290,24 @@ function bindEvents() {
     render();
   });
 
+  $("#reset-current-month").addEventListener("click", () => {
+    const month = todayKey().slice(0, 7);
+    const count = state.entries.filter((entry) => formatMonth(entry.date) === month).length;
+    if (!count) {
+      state.analysisMessage = copy().resetCurrentMonthEmpty(month);
+      render();
+      return;
+    }
+    if (!window.confirm(copy().resetCurrentMonthConfirm(month, count))) return;
+    statementAnalysisRun += 1;
+    state.entries = state.entries.filter((entry) => formatMonth(entry.date) !== month);
+    state.pendingImports = [];
+    state.analysisMessage = copy().resetCurrentMonthDone(month, count);
+    $("#statement-input").value = "";
+    $("#statement-file").value = "";
+    render();
+  });
+
   $("#analyze-statement").addEventListener("click", () => {
     analyzeStatementText($("#statement-input").value.trim());
   });
@@ -1240,7 +1378,10 @@ function bindEvents() {
     const includeId = event.target.dataset.reviewInclude;
     const kindId = event.target.dataset.reviewKind;
     const bucketId = event.target.dataset.reviewBucket;
-    const id = includeId || kindId || bucketId;
+    const titleId = event.target.dataset.reviewTitle;
+    const dateId = event.target.dataset.reviewDate;
+    const amountId = event.target.dataset.reviewAmount;
+    const id = includeId || kindId || bucketId || titleId || dateId || amountId;
     if (!id) return;
 
     const item = state.pendingImports.find((candidate) => candidate.id === id);
@@ -1261,7 +1402,21 @@ function bindEvents() {
       item.reason = reasonForBucket(item.bucket);
       item.included = item.bucket !== "transfer";
     }
+    if (titleId) item.title = event.target.value.trim() || copy().unknownMerchant;
+    if (dateId && event.target.value) item.date = event.target.value;
+    if (amountId) {
+      const amount = Number(event.target.value);
+      if (amount > 0) item.amount = amount;
+    }
     item.reason = reasonForBucket(item.bucket);
+    render();
+  });
+
+  $("#review-list").addEventListener("click", (event) => {
+    const id = event.target.dataset.reviewDelete;
+    if (!id) return;
+    state.pendingImports = state.pendingImports.filter((item) => item.id !== id);
+    state.analysisMessage = copy().analysisReady(state.pendingImports.length);
     render();
   });
 

@@ -66,7 +66,7 @@ Vercel endpoints:
 ```text
 GET  /api/health
 GET  /api/market                 -> lightweight mock metadata
-POST /api/deepseek               -> disabled, frontend uses local mock summary
+POST /api/deepseek               -> DeepSeek transaction validation, deduplication, and 50-30-20 classification
 GET  /api/investflow/state       -> Supabase family state
 POST /api/investflow/state       -> Supabase family state
 ```

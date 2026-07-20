@@ -55,7 +55,10 @@
           <article class="card">
             <div class="card-title-row">
               <h2 data-i18n="monthlyOverview">Monthly overview</h2>
-              <span class="muted" id="monthly-current">-</span>
+              <div class="monthly-actions">
+                <span class="muted" id="monthly-current">-</span>
+                <button id="reset-current-month" class="danger-button compact" data-i18n="resetCurrentMonth" type="button">Reset this month</button>
+              </div>
             </div>
             <div id="monthly-list" class="monthly-list"></div>
           </article>

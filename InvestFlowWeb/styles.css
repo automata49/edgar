@@ -51,6 +51,18 @@ button.primary,
   color: #fff;
 }
 
+button.danger-button {
+  border-color: rgba(189, 61, 53, 0.35);
+  color: var(--bad);
+  background: #fff8f7;
+}
+
+button.compact {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.8rem;
+}
+
 input,
 textarea {
   width: 100%;
@@ -221,6 +233,13 @@ main {
   gap: 8px;
   align-items: center;
   justify-content: space-between;
+}
+
+.monthly-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .button-row {
