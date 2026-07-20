@@ -67,6 +67,8 @@ const i18n = {
     resetCurrentMonthConfirm: (month, count) => `Delete all ${count} transaction entries for ${month}? Recurring allocations will be kept. This cannot be undone.`,
     resetCurrentMonthDone: (month, count) => `${count} transaction entries for ${month} were deleted.`,
     resetCurrentMonthEmpty: (month) => `There are no transaction entries to delete for ${month}.`,
+    resetMonth: "Delete month",
+    resetMonthConfirm: (month, count) => `Delete all ${count} transaction entries for ${month}? Recurring allocations will be kept.`,
     transactionName: "Name",
     transactionDate: "Date",
     deleteTransaction: "Delete",
@@ -193,6 +195,8 @@ const i18n = {
     resetCurrentMonthConfirm: (month, count) => `${month}의 거래 입력 ${count}건을 모두 삭제할까요? 반복 투자 계획은 유지되며, 삭제 후에는 되돌릴 수 없습니다.`,
     resetCurrentMonthDone: (month, count) => `${month}의 거래 입력 ${count}건을 삭제했습니다.`,
     resetCurrentMonthEmpty: (month) => `${month}에 삭제할 거래 입력이 없습니다.`,
+    resetMonth: "월 삭제",
+    resetMonthConfirm: (month, count) => `${month}의 거래 입력 ${count}건을 모두 삭제할까요? 반복 투자 배분은 유지됩니다.`,
     transactionName: "거래명",
     transactionDate: "날짜",
     deleteTransaction: "삭제",
@@ -319,6 +323,8 @@ const financeAnalysisService = {
     const bucket = hana?.bucket ?? (kind === "income" ? "income" : classifyBucket(line));
     const merchant = hana?.merchant ?? extractMerchant(line);
     const currency = hana?.currency ?? detectCurrency(line);
+    const date = hana?.date ?? extractDate(line);
+    if (!date) return null;
 
     return {
       id: uid(),
@@ -328,7 +334,7 @@ const financeAnalysisService = {
       kind,
       bucket,
       currency,
-      date: hana?.date ?? extractDate(line) ?? todayKey(),
+      date,
       institution: hana?.institution ?? detectInstitution(line),
       reason: reasonForBucket(bucket)
     };
@@ -364,14 +370,8 @@ const defaultState = () => ({
   cashKind: "income",
   assetKind: "stock",
   ideaStatus: "Inbox",
-  entries: [
-    { id: uid(), title: "Salary", amount: 6200000, kind: "income", bucket: "income", currency: "KRW", recurring: true },
-    { id: uid(), title: "Rent", amount: 2100000, kind: "expense", bucket: "essential", currency: "KRW", recurring: true },
-    { id: uid(), title: "Core bills", amount: 950000, kind: "expense", bucket: "essential", currency: "KRW", recurring: true }
-  ],
-  allocations: [
-    { id: uid(), symbol: "VOO", amount: 900000, currency: "KRW" }
-  ],
+  entries: [],
+  allocations: [],
   pendingImports: [],
   analysisMessage: "",
   routineDate: todayKey(),
@@ -437,9 +437,14 @@ function normalizeState(parsed) {
   parsed.entries = (parsed.entries ?? []).map((entry) => ({
     ...entry,
     currency: entry.currency ?? inferLegacyCurrency(entry.amount, entry.title),
-    date: entry.date ?? todayKey(),
+    date: extractDate(String(entry.date ?? "")),
     bucket: entry.bucket ?? (entry.kind === "income" ? "income" : classifyBucket(entry.title ?? ""))
   }));
+  if (!parsed.legacySeedDataRemoved) {
+    parsed.entries = parsed.entries.filter((entry) => !isLegacySeedEntry(entry));
+    parsed.allocations = (parsed.allocations ?? []).filter((allocation) => !isLegacySeedAllocation(allocation));
+    parsed.legacySeedDataRemoved = true;
+  }
   parsed.allocations = (parsed.allocations ?? []).map((allocation) => ({
     ...allocation,
     currency: allocation.currency ?? inferLegacyCurrency(allocation.amount, allocation.symbol)
@@ -449,6 +454,18 @@ function normalizeState(parsed) {
     parsed.routine = defaultState().routine;
   }
   return parsed;
+}
+
+function isLegacySeedEntry(entry) {
+  return !entry.source && !entry.raw && entry.recurring === true && (
+    (entry.title === "Salary" && Number(entry.amount) === 6200000)
+    || (entry.title === "Rent" && Number(entry.amount) === 2100000)
+    || (entry.title === "Core bills" && Number(entry.amount) === 950000)
+  );
+}
+
+function isLegacySeedAllocation(allocation) {
+  return allocation.symbol === "VOO" && Number(allocation.amount) === 900000 && allocation.currency === "KRW";
 }
 
 function saveState() {
@@ -590,7 +607,7 @@ function parseHanaBankLine(line) {
     bucket,
     merchant: cleanHanaMerchant(type, memo),
     institution: detectInstitution(text),
-    date: cells[0],
+    date: extractDate(cells[0]),
     currency: "KRW"
   };
 }
@@ -643,8 +660,19 @@ function inferKind(line) {
 }
 
 function extractDate(line) {
-  const match = String(line).match(/\d{4}[-./]\d{1,2}[-./]\d{1,2}/);
-  return match ? match[0].replace(/[./]/g, "-") : "";
+  const text = String(line);
+  const fullYear = text.match(/\b(\d{4})[-./년]\s*(\d{1,2})[-./월]\s*(\d{1,2})(?:일)?\b/);
+  if (fullYear) return validCalendarDate(fullYear[1], fullYear[2], fullYear[3]);
+
+  const shortYear = text.match(/(?:^|\s)(\d{2})[-./]\s*(\d{1,2})[-./]\s*(\d{1,2})(?=\s|$)/);
+  if (shortYear) return validCalendarDate(`20${shortYear[1]}`, shortYear[2], shortYear[3]);
+  return "";
+}
+
+function validCalendarDate(year, month, day) {
+  const normalized = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const date = new Date(`${normalized}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === normalized ? normalized : "";
 }
 
 function detectCurrency(line) {
@@ -851,6 +879,7 @@ function renderMonthlyOverview() {
       <span class="gain">+${money(row.income)}</span>
       <span class="loss">-${money(row.expenses)}</span>
       <b>${money(row.income - row.expenses)}</b>
+      <button class="danger-button compact" data-reset-month="${row.month}" type="button">${copy().resetMonth}</button>
     </div>
   `).join("") : `<p class="muted">${copy().noItems}</p>`;
 }
@@ -864,6 +893,7 @@ function monthlySummaries() {
   currentCurrencyEntries().forEach((entry) => {
     if (entry.kind === "transfer") return;
     const month = formatMonth(entry.date);
+    if (!month) return;
     const row = summary.get(month) ?? { month, income: 0, expenses: 0 };
     if (entry.kind === "income") row.income += Number(entry.amount);
     if (entry.kind === "expense") row.expenses += Number(entry.amount);
@@ -873,11 +903,8 @@ function monthlySummaries() {
 }
 
 function formatMonth(dateValue) {
-  const text = String(dateValue || todayKey());
-  const match = text.match(/\d{4}-\d{1,2}/);
-  if (!match) return todayKey().slice(0, 7);
-  const [year, month] = match[0].split("-");
-  return `${year}-${month.padStart(2, "0")}`;
+  const date = extractDate(String(dateValue || ""));
+  return date ? date.slice(0, 7) : "";
 }
 
 function renderAnalysisResult() {
@@ -1336,6 +1363,15 @@ function bindEvents() {
     render();
   });
 
+  $("#monthly-list").addEventListener("click", (event) => {
+    const month = event.target.dataset.resetMonth;
+    if (!month) return;
+    const count = state.entries.filter((entry) => formatMonth(entry.date) === month).length;
+    if (!count || !window.confirm(copy().resetMonthConfirm(month, count))) return;
+    state.entries = state.entries.filter((entry) => formatMonth(entry.date) !== month);
+    render();
+  });
+
   $("#analyze-statement").addEventListener("click", () => {
     analyzeStatementText($("#statement-input").value.trim());
   });
@@ -1621,5 +1657,5 @@ setInterval(() => {
 }, 300000);
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=11").then((registration) => registration.update()).catch(() => {});
+  navigator.serviceWorker.register("./sw.js?v=12").then((registration) => registration.update()).catch(() => {});
 }
