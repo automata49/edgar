@@ -320,7 +320,9 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Invest Flow";
+				INFOPLIST_KEY_CFBundleDisplayName = "Spend Flow";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "등록한 소비 장소에 도착했을 때 지출 기록 알림을 보내기 위해 위치를 사용합니다.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "현재 위치를 소비 장소로 등록하기 위해 위치를 사용합니다.";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -351,7 +353,9 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Invest Flow";
+				INFOPLIST_KEY_CFBundleDisplayName = "Spend Flow";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "등록한 소비 장소에 도착했을 때 지출 기록 알림을 보내기 위해 위치를 사용합니다.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "현재 위치를 소비 장소로 등록하기 위해 위치를 사용합니다.";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

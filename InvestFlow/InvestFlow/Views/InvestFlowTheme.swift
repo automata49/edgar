@@ -24,4 +24,8 @@ extension Double {
     var usd: String {
         formatted(.currency(code: "USD").precision(.fractionLength(0)))
     }
+
+    var krw: String {
+        formatted(.currency(code: "KRW").precision(.fractionLength(0)))
+    }
 }

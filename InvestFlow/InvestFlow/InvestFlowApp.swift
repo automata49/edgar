@@ -9,6 +9,7 @@ struct InvestFlowApp: App {
         }
         .modelContainer(for: [
             CashFlowEntry.self,
+            SpendingPlace.self,
             InvestmentAllocation.self,
             RoutineSession.self,
             PostItIdea.self,

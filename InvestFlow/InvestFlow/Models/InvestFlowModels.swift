@@ -193,3 +193,22 @@ final class InvestmentPlanProposal {
         self.createdAt = .now
     }
 }
+
+@Model
+final class SpendingPlace {
+    var id: UUID
+    var name: String
+    var latitude: Double
+    var longitude: Double
+    var radius: Double
+    var createdAt: Date
+
+    init(name: String, latitude: Double, longitude: Double, radius: Double = 150) {
+        self.id = UUID()
+        self.name = name
+        self.latitude = latitude
+        self.longitude = longitude
+        self.radius = radius
+        self.createdAt = .now
+    }
+}
