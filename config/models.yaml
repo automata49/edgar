@@ -1,0 +1,54 @@
+# Edgar 멀티 모델 설정
+# 코드는 작업 이름(task)만 알고, 어떤 모델을 쓸지는 이 파일이 정합니다.
+# 모델 이름·가격이 바뀌면 이 파일만 고치면 됩니다.
+
+providers:
+  gemini:
+    api_key_env: GEMINI_API_KEY
+  openai:
+    api_key_env: OPENAI_API_KEY
+
+# 가격: 100만 토큰당 USD. 무료 티어는 0.
+# 출처: https://developers.openai.com/api/docs/models/gpt-6-astra (2026-09 확인)
+pricing:
+  gpt-6-astra: {input: 10.0, cached_input: 1.0, output: 50.0}
+  gemini-3.8-flash: {input: 0, cached_input: 0, output: 0}
+  gemini-3.5-flash-lite: {input: 0, cached_input: 0, output: 0}
+  gemini-2.5-flash: {input: 0, cached_input: 0, output: 0}
+
+tiers:
+  free_light:                     # 분류·형식 정리 (가장 가벼운 모델)
+    paid: false
+    models:
+      - {provider: gemini, model: gemini-3.5-flash-lite, max_output_tokens: 800}
+      - {provider: gemini, model: gemini-2.5-flash, max_output_tokens: 800}
+  free:                           # 요약·일반 대화
+    paid: false
+    models:
+      - {provider: gemini, model: gemini-3.8-flash, max_output_tokens: 2000}
+      - {provider: gemini, model: gemini-2.5-flash, max_output_tokens: 2000}
+  analysis:                       # 종목 분석·정성 초안·주간 리뷰
+    paid: true
+    models:
+      - {provider: openai, model: gpt-6-astra, reasoning: medium, max_output_tokens: 4000}
+    fallback: free                # 예산 초과·오류 시 (private 작업은 제외)
+
+tasks:
+  classify_intent:   {tier: free_light}
+  format_message:    {tier: free_light}
+  summarize_news:    {tier: free}
+  chat_general:      {tier: free}
+  daily_review:      {tier: free}
+  stock_analysis:    {tier: analysis}
+  qualitative_draft: {tier: analysis}
+  weekly_review:     {tier: analysis}
+  # 보유 수량·계좌 정보가 들어가는 작업: Gemini 무료 티어는 입력을 제품 개선에 쓰므로 보내지 않음
+  portfolio_review:  {tier: analysis, private: true}
+
+budget:
+  # ChatGPT Plus 월 요금($20)을 넘지 않도록 API 사용액 상한을 둡니다.
+  # Plus 구독과 API 요금은 별도 청구이므로, 이 상한은 API 청구액 기준입니다.
+  monthly_usd_limit: 20.0
+  soft_limit_ratio: 0.8           # 80%를 넘으면 reasoning을 low로 낮춤
+  chars_per_token: 2.0            # 호출 전 입력 토큰 추정(한국어 보수적)
+  ledger: data/llm_usage.csv

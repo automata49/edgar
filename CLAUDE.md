@@ -6,7 +6,8 @@
 텔레그램으로 전송하는 자동화 봇. Supabase(PostgreSQL)에 모든 데이터 보관.
 
 **인프라**: GitHub Codespaces(개발) → Oracle Cloud ARM VM(운영)  
-**AI**: Claude Sonnet(챗봇) + DeepSeek/Groq/Gemini(시장 분석)  
+**AI**: 멀티 모델 — Gemini 무료 티어(분류·요약·일반 대화) + GPT-6 Astra(종목 분석, 월 $20 상한) · `config/models.yaml`  
+**투자 분석**: 계산은 Pepper(automata49/pepper)가 하고 Edgar는 results JSON을 읽어 전달·해석만 함  
 **영상**: Wan2.1 14B (fal.ai) AI 동영상 생성 → YouTube Shorts 자동 업로드
 
 ---
@@ -19,10 +20,21 @@ database/client.py        ← SupabaseDB (4개 테이블: market_data, youtube_v
 
 telegram_bot/             ← 사용자 인터페이스
   main.py                 ← Application 생성 + 핸들러 등록 + 스케줄러 시작
-  handlers/chat.py        ← Claude AI 자유 대화
+  handlers/chat.py        ← 자유 대화 (router_chat 사용)
   handlers/signal.py      ← /monitor (즉시 실행), /report (최근 리포트)
   handlers/settings.py    ← /style, /api, /status + InlineKeyboard 콜백
-  services/claude_chat.py ← 사용자별 대화 기록 관리
+  handlers/pepper.py      ← /pepper, /stock, /budget, /rules
+  services/router_chat.py ← 멀티 모델 챗봇 (간단→Gemini, 분석→Astra)
+
+llm/                      ← 멀티 모델 계층
+  router.py               ← task → tier → 모델 선택, 예산 초과/오류 시 무료 모델로 대체
+  budget.py               ← Astra 사용액 장부(data/llm_usage.csv) + 월 상한 가드
+  providers/__init__.py   ← GeminiProvider, OpenAIProvider(Responses API)
+config/models.yaml        ← 모델·가격·작업별 티어·월 예산
+
+invest/                   ← Pepper 연동
+  pepper_results.py       ← results JSON 읽기·요약 (숫자 재계산 금지)
+  prompts.py              ← 분석·대화·분류·정성 초안 프롬프트
 
 kstock_signal/            ← 데이터 파이프라인
   scheduler.py            ← SignalScheduler (전체 파이프라인 오케스트레이터)
@@ -98,7 +110,11 @@ python scripts/health_check.py
 | 변수 | 필수 | 설명 |
 |------|------|------|
 | TELEGRAM_BOT_TOKEN    | ✅ | 텔레그램 봇 |
-| ANTHROPIC_API_KEY     | ✅ | Claude AI 챗봇 |
+| GEMINI_API_KEY        | ✅ | 무료 모델(분류·요약·대화) |
+| OPENAI_API_KEY        | ✅ | GPT-6 Astra 분석 (월 $20 상한, config/models.yaml) |
+| PEPPER_RESULTS        | 선택 | Pepper results JSON 경로 (기본 ../pepper/data/results/latest.json) |
+| EDGAR_MODELS_CONFIG   | 선택 | 모델 설정 파일 경로 (기본 config/models.yaml) |
+| ANTHROPIC_API_KEY     | 선택 | 기존 Claude 챗봇 (현재 봇은 router_chat 사용) |
 | DEEPSEEK_API_KEY      | 권장 | 시장 분석 LLM |
 | YOUTUBE_API_KEY       | 권장 | YouTube 수집 + 트렌드 수집 |
 | FAL_KEY               | 권장 | fal.ai Wan2.1 AI 영상 생성 (https://fal.ai) |
@@ -156,7 +172,14 @@ print('✅ 모든 import OK')
 
 # 3. 헬스 체크
 python scripts/health_check.py
+
+# 4. 멀티 모델 라우터 테스트 (네트워크 없이 가짜 모델로 검증)
+python -m unittest discover -s tests -v
 ```
+
+**모델 예산 규칙:**
+- 유료 모델은 반드시 `ModelRouter.run(task, ...)`로만 호출 (직접 SDK 호출 금지 — 예산 가드 우회됨)
+- 보유·계좌 정보가 들어가는 작업은 models.yaml에서 `private: true` (무료 Gemini로 보내지 않음)
 
 **코드 품질 기준:**
 - 각 모듈은 단일 책임 (수집 / 분석 / 발송 분리)

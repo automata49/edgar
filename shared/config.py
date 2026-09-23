@@ -13,6 +13,11 @@ CONFIG: dict = {
     "groq_api_key":      os.getenv("GROQ_API_KEY"),
     "gemini_api_key":    os.getenv("GEMINI_API_KEY"),
     "anthropic_api_key": os.getenv("ANTHROPIC_API_KEY"),
+    "openai_api_key":    os.getenv("OPENAI_API_KEY"),
+
+    # ── Pepper 연동 · 멀티 모델 ──────────────────────────────
+    "models_config":  os.getenv("EDGAR_MODELS_CONFIG", os.path.join(_PROJECT_ROOT, "config", "models.yaml")),
+    "pepper_results": os.getenv("PEPPER_RESULTS", os.path.join(_PROJECT_ROOT, "..", "pepper", "data", "results", "latest.json")),
     "telegram_bot_token": os.getenv("TELEGRAM_BOT_TOKEN"),
     "youtube_api_key":   os.getenv("YOUTUBE_API_KEY"),
 
