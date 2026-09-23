@@ -18,6 +18,15 @@ CONFIG: dict = {
     # ── Pepper 연동 · 멀티 모델 ──────────────────────────────
     "models_config":  os.getenv("EDGAR_MODELS_CONFIG", os.path.join(_PROJECT_ROOT, "config", "models.yaml")),
     "pepper_results": os.getenv("PEPPER_RESULTS", os.path.join(_PROJECT_ROOT, "..", "pepper", "data", "results", "latest.json")),
+    # Pepper Google 시트 (읽기 전용). ID 미지정 시 ../pepper/config/workspace.json 사용
+    "pepper_sheet_id":       os.getenv("PEPPER_SHEET_ID"),
+    "pepper_workspace":      os.path.join(_PROJECT_ROOT, "..", "pepper", "config", "workspace.json"),
+    "pepper_history":        os.getenv("PEPPER_HISTORY", os.path.join(_PROJECT_ROOT, "..", "pepper", "data", "history")),
+    "pepper_sheet_snapshot": os.getenv("PEPPER_SHEET_SNAPSHOT"),
+    # /view 로 개인 데이터를 볼 수 있는 텔레그램 user/chat ID (쉼표 구분). 미지정 시 report_recipients
+    "telegram_allowed_ids":  [int(x) for x in os.getenv("TELEGRAM_ALLOWED_IDS", "").replace(" ", "").split(",")
+                              if x.lstrip("-").isdigit()],
+
     "telegram_bot_token": os.getenv("TELEGRAM_BOT_TOKEN"),
     "youtube_api_key":   os.getenv("YOUTUBE_API_KEY"),
 

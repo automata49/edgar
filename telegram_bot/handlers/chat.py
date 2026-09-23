@@ -3,6 +3,8 @@ from __future__ import annotations
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from telegram_bot.handlers.browse import try_view_message
+
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = context.bot_data["chat"]
@@ -10,6 +12,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await update.message.reply_text(
         "🤖 Edgar AI 봇\n\n"
         "명령어:\n"
+        "/view    — 시트·수집 데이터 보기 (버튼 메뉴)\n"
         "/monitor — 즉시 시장 분석 실행\n"
         "/report  — 최근 리포트 조회\n"
         "/style   — 분석 스타일 변경\n"
@@ -32,6 +35,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text(
         "📖 사용법:\n\n"
         "• 자유롭게 메시지 → Gemini(무료)와 대화, 종목 분석 질문은 GPT-6 Astra\n"
+        "• /view    → 버튼 메뉴로 포트폴리오·리서치·재무·시장·뉴스·YouTube 보기\n"
+        "  (/view pf NVDA 처럼 바로 이동, 채팅으로 \"포트폴리오 보여줘\"도 가능)\n"
         "• /monitor → 지금 바로 시장 분석 리포트 생성\n"
         "• /report  → 마지막으로 저장된 리포트 보기\n"
         "• /style   → 리포트 스타일 선택 (5가지)\n"
@@ -46,6 +51,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if await try_view_message(update, context):
+        return
     chat = context.bot_data["chat"]
     await update.message.chat.send_action("typing")
     answer = await chat.reply(update.effective_user.id, update.message.text)

@@ -108,6 +108,26 @@ class SupabaseDB:
         )
         return result.data[0] if result.data else None
 
+    def recent_news(self, limit: int = 40) -> list[dict]:
+        result = (
+            self.client.table("news_articles")
+            .select("title,url,source,published_at,collected_at")
+            .order("collected_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return result.data or []
+
+    def recent_videos(self, limit: int = 40) -> list[dict]:
+        result = (
+            self.client.table("youtube_videos")
+            .select("title,url,channel,category,published_at,collected_at")
+            .order("collected_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return result.data or []
+
     # ── Invest Flow ─────────────────────────────────────────────────────────
 
     def get_invest_flow_state(self, family_id: str = "family") -> dict | None:

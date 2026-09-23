@@ -19,11 +19,13 @@ from telegram.ext import (
 from shared.config import CONFIG
 from database.client import SupabaseDB
 from kstock_signal.scheduler import SignalScheduler
+from invest.sheets import SheetReader, spreadsheet_id_from
 from llm.router import ModelRouter
 from telegram_bot.services.router_chat import RouterChat
 from telegram_bot.handlers.chat import (
     clear_command, handle_message, help_command, start_command,
 )
+from telegram_bot.handlers.browse import view_callback, view_command
 from telegram_bot.handlers.signal import monitor_command, report_command
 from telegram_bot.handlers.pepper import budget_command, pepper_command, rules_command, stock_command
 from telegram_bot.handlers.settings_handler import (
@@ -59,6 +61,11 @@ def create_app() -> Application:
     app.bot_data["chat"]        = RouterChat(router, CONFIG.get("pepper_results"))
     app.bot_data["scheduler"]   = SignalScheduler(CONFIG, bot=app.bot, db=db)
     app.bot_data["db"]          = db
+    app.bot_data["sheets"]      = SheetReader(
+        CONFIG.get("pepper_sheet_id") or spreadsheet_id_from(CONFIG.get("pepper_workspace", "")),
+        history_dir=CONFIG.get("pepper_history"),
+        snapshot_path=CONFIG.get("pepper_sheet_snapshot"),
+    )
 
     # 핸들러 등록
     app.add_handler(CommandHandler("start",   start_command))
@@ -73,6 +80,8 @@ def create_app() -> Application:
     app.add_handler(CommandHandler("stock",   stock_command))
     app.add_handler(CommandHandler("budget",  budget_command))
     app.add_handler(CommandHandler("rules",   rules_command))
+    app.add_handler(CommandHandler(["view", "sheet", "data"], view_command))
+    app.add_handler(CallbackQueryHandler(view_callback, pattern=r"^v:"))   # callback_handler 보다 먼저
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 

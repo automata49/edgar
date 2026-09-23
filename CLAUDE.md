@@ -24,6 +24,7 @@ telegram_bot/             ← 사용자 인터페이스
   handlers/signal.py      ← /monitor (즉시 실행), /report (최근 리포트)
   handlers/settings.py    ← /style, /api, /status + InlineKeyboard 콜백
   handlers/pepper.py      ← /pepper, /stock, /budget, /rules
+  handlers/browse.py      ← /view 버튼 메뉴 (Google 시트 + 수집 데이터 조회, "포트폴리오 보여줘" 같은 채팅도 연결)
   services/router_chat.py ← 멀티 모델 챗봇 (간단→Gemini, 분석→Astra)
 
 llm/                      ← 멀티 모델 계층
@@ -35,6 +36,8 @@ config/models.yaml        ← 모델·가격·작업별 티어·월 예산
 invest/                   ← Pepper 연동
   pepper_results.py       ← results JSON 읽기·요약 (숫자 재계산 금지)
   prompts.py              ← 분석·대화·분류·정성 초안 프롬프트
+  sheets.py               ← Pepper Google 시트 읽기 (읽기 전용, 5분 캐시, 실패 시 pepper sync 스냅샷)
+  views.py                ← 텔레그램 화면 포맷터 (HTML 카드 + 인라인 버튼, 순수 함수)
 
 kstock_signal/            ← 데이터 파이프라인
   scheduler.py            ← SignalScheduler (전체 파이프라인 오케스트레이터)
@@ -113,6 +116,11 @@ python scripts/health_check.py
 | GEMINI_API_KEY        | ✅ | 무료 모델(분류·요약·대화) |
 | OPENAI_API_KEY        | ✅ | GPT-6 Astra 분석 (월 $20 상한, config/models.yaml) |
 | PEPPER_RESULTS        | 선택 | Pepper results JSON 경로 (기본 ../pepper/data/results/latest.json) |
+| PEPPER_SHEET_ID       | 선택 | Pepper Google 시트 ID (기본 ../pepper/config/workspace.json) |
+| GOOGLE_APPLICATION_CREDENTIALS | 선택 | 시트 직접 읽기용 서비스 계정 JSON (시트를 그 계정 이메일에 보기 권한 공유) |
+| PEPPER_HISTORY        | 선택 | 시트 대체 스냅샷 폴더 (기본 ../pepper/data/history, `pepper sync`가 생성) |
+| PEPPER_SHEET_SNAPSHOT | 선택 | 대체 스냅샷 JSON 파일 1개 |
+| TELEGRAM_ALLOWED_IDS  | 선택 | /view 사용 가능한 텔레그램 user ID (쉼표 구분, 기본 report_recipients의 개인 ID) |
 | EDGAR_MODELS_CONFIG   | 선택 | 모델 설정 파일 경로 (기본 config/models.yaml) |
 | ANTHROPIC_API_KEY     | 선택 | 기존 Claude 챗봇 (현재 봇은 router_chat 사용) |
 | DEEPSEEK_API_KEY      | 권장 | 시장 분석 LLM |
