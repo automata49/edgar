@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import io
 import os
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 
 import pdfplumber
 import requests
@@ -20,14 +21,78 @@ _HEADERS = {
 _LIST_URL = "https://finance.naver.com/research/company_list.naver"
 
 
+def report_day(date_text: str) -> str | None:
+    """네이버 날짜 '26.04.30' → '2026-04-30'. 형식이 다르면 None."""
+    m = re.fullmatch(r"(\d{2})\.(\d{2})\.(\d{2})", (date_text or "").strip())
+    return f"20{m.group(1)}-{m.group(2)}-{m.group(3)}" if m else None
+
+
 def _safe_dirname(name: str) -> str:
     """파일/디렉토리명에 사용할 수 없는 문자를 제거."""
     return re.sub(r"[^\w가-힣\-]", "_", name).strip("_") or "unknown"
 
 
+def parse_list_html(html: str) -> list[NaverReport]:
+    """
+    종목분석 리포트 목록 HTML → NaverReport 목록.
+    테이블 컬럼: [0] 종목명(+code href) [1] 제목(+nid href) [2] 증권사 [3] PDF 링크 [4] 날짜 [5] 조회수
+    """
+    reports: list[NaverReport] = []
+    table = BeautifulSoup(html, "html.parser").find("table", class_="type_1")
+    if not table:
+        return reports
+    for row in table.find_all("tr"):
+        cells = row.find_all("td")
+        if len(cells) < 5:
+            continue
+
+        stock_name = cells[0].get_text(strip=True)
+        if not stock_name:
+            continue
+        stock_code = ""
+        code_tag = cells[0].find("a")
+        if code_tag and (m := re.search(r"code=(\w{6})", code_tag.get("href", ""))):
+            stock_code = m.group(1)
+
+        # 리포트 제목 + nid 추출
+        title_tag  = cells[1].find("a")
+        title      = title_tag.get_text(strip=True) if title_tag else ""
+        report_id  = ""
+        if title_tag and title_tag.get("href"):
+            m = re.search(r"nid=(\d+)", title_tag["href"])
+            if m:
+                report_id = m.group(1)
+
+        firm = cells[2].get_text(strip=True)
+        date = cells[4].get_text(strip=True)
+
+        # PDF URL: cell[3] 앵커 href 직접 사용
+        pdf_url = ""
+        pdf_tag = cells[3].find("a")
+        if pdf_tag and pdf_tag.get("href", ""):
+            href = pdf_tag["href"]
+            pdf_url = href if href.startswith("http") else "https://finance.naver.com" + href
+
+        if not title:
+            continue
+
+        reports.append(NaverReport(
+            stock_name=stock_name,
+            stock_code=stock_code,
+            firm=firm,
+            title=title,
+            target_price="",
+            date=date,
+            pdf_url=pdf_url,
+            report_id=report_id,
+        ))
+    return reports
+
+
 @dataclass
 class NaverReport:
     stock_name:  str
+    stock_code:  str
     firm:        str
     title:       str
     target_price: str
@@ -44,19 +109,45 @@ class NaverReportCollector:
     def __init__(self, config: dict) -> None:
         cfg = config.get("naver_report", {})
         self.target_symbols: list[str] = cfg.get("target_symbols", [])
-        self.max_reports:    int        = cfg.get("max_reports", 3)
+        self.max_reports:    int        = cfg.get("max_reports", 20)
+        self.pages:          int        = max(1, cfg.get("pages", 2))
         self.save_dir:       str | None = cfg.get("save_dir")
         self.session = requests.Session()
         self.session.headers.update(_HEADERS)
 
-    async def collect(self) -> list[dict]:
-        print("📑 네이버 리포트 수집 중...")
-        reports = self._fetch_list()
-
+    def list_reports(self) -> list[NaverReport]:
+        """목록 페이지들을 읽어 대상 종목 리포트만 돌려줍니다 (PDF는 받지 않음)."""
+        reports: list[NaverReport] = []
+        seen: set[str] = set()
+        for page in range(1, self.pages + 1):
+            for r in self._fetch_list(page):
+                key = r.report_id or f"{r.stock_name}|{r.firm}|{r.title}|{r.date}"
+                if key not in seen:
+                    seen.add(key)
+                    reports.append(r)
         if self.target_symbols:
-            filtered = [r for r in reports if any(s in r.stock_name for s in self.target_symbols)]
-            reports  = filtered or reports  # 매칭 없으면 전체 사용
+            reports = [r for r in reports
+                       if any(s == r.stock_code or s in r.stock_name for s in self.target_symbols)]
+        return reports
 
+    async def collect(self, known_ids: Callable[[list[str]], set[str]] | None = None) -> list[dict]:
+        """새 리포트의 PDF를 받아 본문을 추출합니다.
+
+        known_ids: report_id 목록을 받아 이미 저장된 id 집합을 돌려주는 함수(보통 DB 조회). 해당 리포트는 건너뜁니다.
+        """
+        return await asyncio.to_thread(self.fetch_new, known_ids)
+
+    def fetch_new(self, known_ids: Callable[[list[str]], set[str]] | None = None) -> list[dict]:
+        print("📑 네이버 리포트 수집 중...")
+        listed = self.list_reports()
+        skip: set[str] = set()
+        if known_ids:
+            try:
+                skip = known_ids([r.report_id for r in listed if r.report_id])
+            except Exception as e:  # noqa: BLE001 — DB 오류 시 전부 새 리포트로 처리
+                print(f"   ⚠️  저장된 리포트 확인 실패: {e}")
+        reports = [r for r in listed if not (r.report_id and r.report_id in skip)]
+        print(f"   목록 {len(listed)}건 · 이미 저장 {len(listed) - len(reports)}건 · 새 리포트 {len(reports)}건")
         reports = reports[: self.max_reports]
         results: list[dict] = []
 
@@ -75,65 +166,14 @@ class NaverReportCollector:
 
     # ── List Scraping ────────────────────────────────────────────────────────
 
-    def _fetch_list(self) -> list[NaverReport]:
-        """
-        실제 테이블 컬럼 순서:
-          [0] 종목명  [1] 리포트 제목(+nid href)  [2] 증권사
-          [3] PDF 링크(img cell)  [4] 날짜  [5] 조회수
-        """
-        reports: list[NaverReport] = []
+    def _fetch_list(self, page: int = 1) -> list[NaverReport]:
         try:
-            r = self.session.get(_LIST_URL, timeout=10)
+            r = self.session.get(_LIST_URL, params={"page": page}, timeout=10)
             r.encoding = "euc-kr"
-            soup = BeautifulSoup(r.text, "html.parser")
-
-            table = soup.find("table", class_="type_1")
-            if not table:
-                return reports
-
-            for row in table.find_all("tr"):
-                cells = row.find_all("td")
-                if len(cells) < 5:
-                    continue
-
-                stock_name = cells[0].get_text(strip=True)
-                if not stock_name:
-                    continue
-
-                # 리포트 제목 + nid 추출
-                title_tag  = cells[1].find("a")
-                title      = title_tag.get_text(strip=True) if title_tag else ""
-                report_id  = ""
-                if title_tag and title_tag.get("href"):
-                    m = re.search(r"nid=(\d+)", title_tag["href"])
-                    if m:
-                        report_id = m.group(1)
-
-                firm = cells[2].get_text(strip=True)
-                date = cells[4].get_text(strip=True)
-
-                # PDF URL: cell[3] 앵커 href 직접 사용
-                pdf_url = ""
-                pdf_tag = cells[3].find("a")
-                if pdf_tag and pdf_tag.get("href", ""):
-                    href = pdf_tag["href"]
-                    pdf_url = href if href.startswith("http") else "https://finance.naver.com" + href
-
-                if not title:
-                    continue
-
-                reports.append(NaverReport(
-                    stock_name=stock_name,
-                    firm=firm,
-                    title=title,
-                    target_price="",
-                    date=date,
-                    pdf_url=pdf_url,
-                    report_id=report_id,
-                ))
+            return parse_list_html(r.text)
         except Exception as e:
-            print(f"   ⚠️  네이버 리포트 리스트 오류: {e}")
-        return reports
+            print(f"   ⚠️  네이버 리포트 리스트 오류 (page {page}): {e}")
+            return []
 
     # ── PDF Fetch / Parse / Save ─────────────────────────────────────────────
 
@@ -151,7 +191,8 @@ class NaverReportCollector:
             print(f"   ⚠️  PDF 다운로드 실패 ({pdf_url[:60]}): {e}")
             return None
 
-    def _parse_pdf_text(self, pdf_bytes: bytes) -> str:
+    @staticmethod
+    def _parse_pdf_text(pdf_bytes: bytes) -> str:
         try:
             with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
                 pages = pdf.pages[:8]
@@ -175,7 +216,8 @@ class NaverReportCollector:
 
     # ── Key Number Extraction ────────────────────────────────────────────────
 
-    def _extract_key_numbers(self, text: str) -> list[str]:
+    @staticmethod
+    def _extract_key_numbers(text: str) -> list[str]:
         """텍스트에서 투자 핵심 수치 추출 (목표가, 영업이익, 매출 등)."""
         patterns = [
             r"목표[주가가격][\s:：]*[\d,]+원",
@@ -196,10 +238,12 @@ class NaverReportCollector:
     def _to_dict(self, r: NaverReport) -> dict:
         return {
             "stock_name":   r.stock_name,
+            "stock_code":   r.stock_code,
             "firm":         r.firm,
             "title":        r.title,
             "target_price": r.target_price,
             "date":         r.date,
+            "report_day":   report_day(r.date),
             "pdf_url":      r.pdf_url,
             "report_id":    r.report_id,
             "text":         r.text,

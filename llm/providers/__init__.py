@@ -50,7 +50,11 @@ class GeminiProvider:
                       getattr(meta, "candidates_token_count", 0) or 0)
         if not resp.text:
             raise ProviderError("Gemini 빈 응답")
-        return resp.text, usage
+        text = resp.text
+        finish = str(getattr((resp.candidates or [None])[0], "finish_reason", "") or "")
+        if "MAX_TOKENS" in finish:
+            text += "\n\n(출력 토큰 한도에 도달해 답변이 잘렸을 수 있습니다)"
+        return text, usage
 
 
 class OpenAIProvider:

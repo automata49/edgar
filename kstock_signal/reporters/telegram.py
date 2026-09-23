@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from kstock_signal.reporters.research_text import daily_section
+
 
 class TelegramReporter:
     """분석 결과를 텔레그램 메시지로 포맷·발송."""
@@ -17,6 +19,7 @@ class TelegramReporter:
         market_data: dict | None = None,
         youtube_data: list | None = None,
         news_data: list | None = None,
+        research: list | None = None,
     ) -> None:
         market_data  = market_data or {}
         youtube_data = youtube_data or []
@@ -29,17 +32,30 @@ class TelegramReporter:
         await self._send(chat_id, main)
         if action:
             await self._send(chat_id, f"📋 액션 플랜:\n\n{action}")
+        if research:
+            await self.send_text(chat_id, daily_section(research))
         await self._send(chat_id, self._sources(youtube_data, news_data))
+
+    async def send_text(self, chat_id: int, text: str) -> None:
+        """긴 텍스트를 줄 단위로 4000자 이하 메시지로 나눠 보냅니다."""
+        chunk = ""
+        for line in text.splitlines():
+            if len(chunk) + len(line) + 1 > 4000:
+                await self._send(chat_id, chunk)
+                chunk = ""
+            chunk += line[:4000] + "\n"
+        await self._send(chat_id, chunk)
 
     # ── Format ───────────────────────────────────────────────────────────────
 
     def _header(self, stats: dict, market_data: dict) -> str:
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
         lines = [
-            f"📊 {now} 트렌드 리포트",
+            f"📊 {now} Daily 리포트",
             "━" * 30,
             f"• YouTube: {stats.get('youtube_count', 0)}개",
             f"• 뉴스: {stats.get('website_count', 0)}개",
+            f"• 증권사 리포트: {stats.get('research_count', 0)}건",
             "",
         ]
         if market_data:

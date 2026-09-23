@@ -24,6 +24,7 @@ class GeminiText:
         return self.models[0]
 
     def generate(self, prompt: str, max_output_tokens: int = 3000) -> str:
+        max_output_tokens = max(max_output_tokens, 8000)   # Gemini 3.x 생각 토큰 포함
         """성공한 첫 모델의 답을 돌려줍니다. 모두 실패하면 마지막 오류를 올립니다."""
         last: Exception | None = None
         for model in dict.fromkeys(self.models):   # 중복 제거, 순서 유지

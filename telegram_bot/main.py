@@ -25,7 +25,7 @@ from telegram_bot.services.router_chat import RouterChat
 from telegram_bot.handlers.chat import (
     clear_command, handle_message, help_command, start_command,
 )
-from telegram_bot.handlers.browse import view_callback, view_command
+from telegram_bot.handlers.browse import research_command, view_callback, view_command, weekly_command
 from telegram_bot.handlers.signal import monitor_command, report_command
 from telegram_bot.handlers.pepper import budget_command, pepper_command, rules_command, stock_command
 from telegram_bot.handlers.settings_handler import (
@@ -59,7 +59,7 @@ def create_app() -> Application:
     db = build_db()
     router = ModelRouter.from_config(CONFIG.get("models_config"))
     app.bot_data["chat"]        = RouterChat(router, CONFIG.get("pepper_results"))
-    app.bot_data["scheduler"]   = SignalScheduler(CONFIG, bot=app.bot, db=db)
+    app.bot_data["scheduler"]   = SignalScheduler(CONFIG, bot=app.bot, db=db, router=router)
     app.bot_data["db"]          = db
     app.bot_data["sheets"]      = SheetReader(
         CONFIG.get("pepper_sheet_id") or spreadsheet_id_from(CONFIG.get("pepper_workspace", "")),
@@ -81,6 +81,8 @@ def create_app() -> Application:
     app.add_handler(CommandHandler("budget",  budget_command))
     app.add_handler(CommandHandler("rules",   rules_command))
     app.add_handler(CommandHandler(["view", "sheet", "data"], view_command))
+    app.add_handler(CommandHandler("research", research_command))
+    app.add_handler(CommandHandler("weekly",   weekly_command))
     app.add_handler(CallbackQueryHandler(view_callback, pattern=r"^v:"))   # callback_handler 보다 먼저
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

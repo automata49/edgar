@@ -21,8 +21,9 @@ class TrendAnalyzer:
         self._client  = self._init_client(config)
         print(f"🤖 AI: {self.provider} / 스타일: {self.style}")
 
-    def analyze(self, youtube_data: list, news_data: list, market_data: dict) -> str:
-        prompt = self._build_prompt(youtube_data, news_data, market_data)
+    def analyze(self, youtube_data: list, news_data: list, market_data: dict,
+                research: list[dict] | None = None) -> str:
+        prompt = self._build_prompt(youtube_data, news_data, market_data, research or [])
         return self._call(prompt)
 
     # ── Init ─────────────────────────────────────────────────────────────────
@@ -46,7 +47,10 @@ class TrendAnalyzer:
 
     # ── Prompt ───────────────────────────────────────────────────────────────
 
-    def _build_prompt(self, youtube_data: list, news_data: list, market_data: dict) -> str:
+    def _build_prompt(self, youtube_data: list, news_data: list, market_data: dict,
+                      research: list[dict] | None = None) -> str:
+        from kstock_signal.reporters.research_text import prompt_lines
+
         style_guides = {
             "professional":  "데이터 중심의 객관적 분석. 팩트와 의견을 명확히 구분하라.",
             "aggressive":    "명확한 매수/매도/보유 의견. 목표가와 손절가를 구체적으로 제시하라.",
@@ -85,6 +89,9 @@ class TrendAnalyzer:
 === 뉴스/RSS ===
 {news_str}
 
+=== 증권사 종목분석 리포트 (신규) ===
+{prompt_lines(research or [])}
+
 위 데이터를 바탕으로 다음 형식으로 분석하세요:
 
 📊 종합 트렌드 분석
@@ -92,6 +99,9 @@ class TrendAnalyzer:
 
 🎯 핵심 투자 포인트
 (3-5개 핵심 포인트)
+
+📑 증권사 리포트 포인트
+(신규 리포트가 있으면 눈에 띄는 종목·목표가 변화 2-3개, 없으면 생략)
 
 ⚠️ 리스크 요인
 (주요 리스크)

@@ -120,12 +120,13 @@ def home(sheet_url: str | None = None) -> Page:
     text = ("🗂 <b>Edgar 데이터 보기</b>\n"
             "보고 싶은 항목을 누르세요. 채팅으로 \"포트폴리오 보여줘\", \"뉴스 확인\"처럼 말해도 됩니다.\n\n"
             "<b>📒 Google 시트 (Pepper)</b>\n포트폴리오 · 리서치 · 재무 · 밸류에이션 · 가격\n\n"
-            "<b>📡 수집 데이터</b>\n시장 · 뉴스 · YouTube · 최근 리포트 · Pepper 점수")
+            "<b>📡 수집 데이터</b>\n증권사 리포트 · 시장 · 뉴스 · YouTube · Daily/Weekly 리포트 · Pepper 점수")
     buttons = [
-        [("💼 포트폴리오", "v:pf"), ("🔎 리서치", "v:rs")],
+        [("💼 포트폴리오", "v:pf"), ("🔎 리서치 판정", "v:rs")],
         [("💵 재무", "v:fin"), ("📐 밸류에이션", "v:val"), ("💹 가격", "v:px")],
         [("📈 시장", "v:mkt"), ("📰 뉴스", "v:news:1"), ("🎬 YouTube", "v:yt:1")],
-        [("📝 최근 리포트", "v:rpt"), ("🧮 Pepper 점수", "v:pep")],
+        [("📑 증권사 리포트", "v:rr"), ("🧮 Pepper 점수", "v:pep")],
+        [("📝 Daily 리포트", "v:rpt"), ("🗓 Weekly 리포트", "v:wk")],
     ]
     if sheet_url:
         buttons.append([("📎 시트 열기", "url:" + sheet_url)])
@@ -376,10 +377,82 @@ def pepper_detail(results: dict | None, ticker: str) -> Page:
     return Page(_cut(text), [[("🤖 AI 해석 (Astra)", f"v:ai:{ticker}")], _nav("pep")])
 
 
+# ── 증권사 리서치 리포트 ─────────────────────────────────────
+_MARK = {"상향": "▲", "하향": "▼", "신규": "🆕"}
+_SENT = {"긍정": "🟢", "중립": "⚪", "부정": "🔴"}
+
+
+def _target(v, change) -> str:
+    return f"목표 {won(v)}{_MARK.get(change, '')}" if _is_num(v) and v else ""
+
+
+def _stock_key(row: dict) -> str:
+    """callback_data(64바이트)에 넣을 종목 키: 코드 우선, 없으면 이름 앞 15자."""
+    return str(row.get("stock_code") or str(row.get("stock_name") or "")[:15])
+
+
+def research_stocks(stocks: list[dict]) -> Page:
+    """stock_research 뷰 행 → 종목별 목록."""
+    lines = [f"📑 <b>증권사 리포트 · 종목별</b> ({len(stocks)}종목)", "<i>최근 리포트 순 · 네이버 종목분석</i>"]
+    if not stocks:
+        lines.append("\n저장된 리포트가 없습니다. 매일 Daily 실행 때 수집됩니다.")
+    for r in stocks[:25]:
+        code = f" ({escape(str(r['stock_code']))})" if r.get("stock_code") else ""
+        opinion = r.get("last_opinion") if r.get("last_opinion") not in (None, "미확인") else ""
+        meta = " · ".join(x for x in (escape(str(opinion or "")), _target(r.get("last_target"), r.get("last_target_change"))) if x)
+        lines += [
+            "",
+            (f"{_SENT.get(r.get('last_sentiment'), '•')} <b>{escape(str(r.get('stock_name')))}</b>{code} "
+             f"· {r.get('report_count', 0)}건 (30일 {r.get('reports_30d', 0)})"),
+            f"  {_date(r.get('last_report_day'))} {escape(str(r.get('last_firm') or ''))}" + (f" · {meta}" if meta else ""),
+            f"  └ {escape(str(r.get('last_one_line') or ''))}",
+        ]
+    buttons = _grid([(f"🔍 {str(r.get('stock_name'))[:10]}", f"v:rr:{_stock_key(r)}") for r in stocks[:24]], per_row=3)
+    buttons.append(_nav())
+    return Page(_cut("\n".join(lines)), buttons)
+
+
+def research_reports(rows: list[dict], query: str) -> Page:
+    """한 종목의 최근 리포트 카드."""
+    if not rows:
+        return Page(f"📑 '{escape(query)}' 리포트가 없습니다.", [_nav("rr")])
+    first = rows[0]
+    code = f" ({escape(str(first['stock_code']))})" if first.get("stock_code") else ""
+    lines = [f"📑 <b>{escape(str(first.get('stock_name')))}</b>{code} · 최근 리포트 {len(rows)}건"]
+    for r in rows:
+        s = r.get("summary") or {}
+        opinion = str(r.get("opinion") or "미확인")
+        if s.get("opinion_change") not in (None, "", "미확인"):
+            opinion += f"({s['opinion_change']})"
+        meta = " · ".join(x for x in (escape(opinion), _target(r.get("target_value"), r.get("target_change")),
+                                      f"{_SENT.get(r.get('sentiment'), '')}{escape(str(r.get('sentiment') or ''))}") if x)
+        lines += ["", f"<b>{_date(r.get('report_day'))} {escape(str(r.get('firm') or ''))}</b> — {escape(str(r.get('title') or ''))}",
+                  meta]
+        if s.get("one_line"):
+            lines.append(f"<i>{escape(str(s['one_line']))}</i>")
+        lines += [f"• {escape(str(p))}" for p in (s.get("key_points") or [])[:3]]
+        lines += [f"⚠️ {escape(str(p))}" for p in (s.get("risks") or [])[:2]]
+        nums = " · ".join(f"{n.get('label')} {n.get('value')}" for n in (s.get("numbers") or [])[:4])
+        if nums:
+            lines.append(f"📊 {escape(nums)}")
+        if r.get("pdf_url"):
+            lines.append(f'<a href="{escape(str(r["pdf_url"]), quote=True)}">📄 PDF</a>')
+    return Page(_cut("\n".join(lines)), [_nav("rr")])
+
+
+def weekly(rep: dict | None) -> Page:
+    if not rep:
+        return Page("🗓 저장된 Weekly 리포트가 없습니다. /weekly 로 지금 만들 수 있습니다.", [_nav()])
+    text = f"<i>{escape(str(rep.get('created_at') or '')[:16].replace('T', ' '))}</i>\n" + escape(str(rep.get("analysis") or ""))
+    return Page(_cut(text), [_nav()])
+
+
 # ── 자연어 → 화면 ─────────────────────────────────────────────
 _SHOW = re.compile(r"보여|확인|알려|조회|봐|볼래|열어|정리|현황|목록|메뉴")
 _INTENTS = [
     (re.compile(r"메뉴|데이터\s*보기|시트\s*(메뉴|목록)"), "home"),
+    (re.compile(r"증권사|리서치\s*리포트|애널리스트|목표\s*주가"), "rr"),
+    (re.compile(r"주간|위클리|weekly", re.IGNORECASE), "wk"),
     (re.compile(r"포트폴리오|보유\s*종목|내\s*종목|잔고"), "pf"),
     (re.compile(r"리서치|판정"), "rs"),
     (re.compile(r"재무|ROE|듀퐁|DuPont", re.IGNORECASE), "fin"),

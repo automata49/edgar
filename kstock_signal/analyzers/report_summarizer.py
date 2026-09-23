@@ -1,218 +1,128 @@
+"""네이버 종목분석 리포트 1건 → 구조화된 한국어 요약.
+
+ModelRouter의 `report_summary` 작업(무료 Gemini 티어, 기본 gemini-3.8-flash)을 사용합니다.
+숫자(목표주가·실적)는 리포트 본문에 적힌 값만 옮기고 새로 계산하지 않습니다.
+"""
 from __future__ import annotations
 
 import json
-import os
 import re
-from collections import defaultdict
-from datetime import datetime
+
+SYSTEM = """너는 증권사 리서치 리포트를 정리하는 조사원이다. 한국어로 답한다.
+- 제공된 본문에 적힌 내용과 숫자만 사용한다. 계산·추정·외부 지식은 쓰지 않는다.
+- 본문에서 확인할 수 없는 값은 0 또는 '미확인'으로 둔다.
+- 목표주가·현재주가는 원 단위 정수로 적는다 (예: '9만 원' → 90000).
+- 쉬운 말로 쓰되 핵심 숫자(매출·영업이익·성장률 등)는 본문 표기 그대로 포함한다."""
+
+SCHEMA = {
+    "type": "object",
+    "properties": {
+        "one_line":       {"type": "string", "description": "핵심 한 줄 (60자 이내)"},
+        "sentiment":      {"type": "string", "enum": ["긍정", "중립", "부정"]},
+        "opinion":        {"type": "string", "description": "투자의견 (예: 매수, Buy, 중립). 없으면 '미확인'"},
+        "opinion_change": {"type": "string", "enum": ["상향", "하향", "유지", "신규", "미확인"]},
+        "target_price":   {"type": "integer", "description": "목표주가(원). 없으면 0"},
+        "target_change":  {"type": "string", "enum": ["상향", "하향", "유지", "신규", "미확인"]},
+        "current_price":  {"type": "integer", "description": "리포트에 적힌 현재주가(원). 없으면 0"},
+        "key_points":     {"type": "array", "items": {"type": "string"}, "description": "핵심 포인트 3개 (각 80자 이내)"},
+        "risks":          {"type": "array", "items": {"type": "string"}, "description": "리스크 0~2개"},
+        "numbers":        {"type": "array", "items": {
+            "type": "object",
+            "properties": {"label": {"type": "string"}, "value": {"type": "string"}},
+            "required": ["label", "value"]}, "description": "핵심 수치 최대 5개 (본문 표기 그대로)"},
+    },
+    "required": ["one_line", "sentiment", "opinion", "opinion_change", "target_price", "target_change",
+                 "current_price", "key_points", "risks", "numbers"],
+}
+
+_CHANGES = {"상향", "하향", "유지", "신규", "미확인"}
 
 
 class ReportSummarizer:
-    """
-    [1단계] 네이버 리포트 목록 → 종목별 한국어 요약 생성.
+    def __init__(self, router, config: dict | None = None) -> None:
+        self.router = router
+        self.max_chars = (config or {}).get("naver_report", {}).get("max_text_chars", 6000)
 
-    - 동일 종목 리포트를 묶어 하나의 요약 생성
-    - 2~3개 핵심 주제 중심으로 요약
-    - 고등학생도 이해할 수 있는 언어 사용
-    """
-
-    def __init__(self, config: dict) -> None:
-        self.provider    = config.get("llm_provider", "gemini")
-        cfg              = config.get("report_summary", {})
-        self.output_dir: str = cfg.get("output_dir", "data/summaries")
-        self.max_chars:  int = cfg.get("max_text_chars", 3000)
-        self._client     = self._init_client(config)
-
-    # ── Public API ───────────────────────────────────────────────────────────
-
-    def summarize_by_stock(self, reports: list[dict]) -> list[dict]:
-        """종목별로 리포트를 묶어 요약 생성. 저장 후 목록 반환."""
-        grouped  = self._group_by_stock(reports)
-        results: list[dict] = []
-        for stock_name, stock_reports in grouped.items():
-            print(f"   📝 {stock_name} 요약 생성 중... ({len(stock_reports)}건)")
-            summary = self._summarize_stock(stock_name, stock_reports)
-            self._save(summary)
-            results.append(summary)
-        return results
-
-    # ── Grouping ─────────────────────────────────────────────────────────────
-
-    def _group_by_stock(self, reports: list[dict]) -> dict[str, list[dict]]:
-        groups: dict[str, list[dict]] = defaultdict(list)
-        for report in reports:
-            name = report.get("stock_name", "Unknown")
-            groups[name].append(report)
-        return dict(groups)
-
-    # ── Summarization ────────────────────────────────────────────────────────
-
-    def _summarize_stock(self, stock_name: str, reports: list[dict]) -> dict:
-        combined = self._combine_texts(reports)
-        prompt   = self._build_prompt(stock_name, reports, combined)
-        raw      = self._call_llm(prompt)
-        return self._parse(raw, stock_name, reports)
-
-    def _combine_texts(self, reports: list[dict]) -> str:
-        parts: list[str] = []
-        budget = self.max_chars
-        for r in reports:
-            text = r.get("text", "").strip()
-            if not text:
-                continue
-            chunk = text[: min(budget, 1200)]
-            parts.append(f"[{r.get('firm', '')} / {r.get('date', '')}]\n{chunk}")
-            budget -= len(chunk)
-            if budget <= 0:
-                break
-        return "\n\n---\n\n".join(parts)
-
-    def _build_prompt(self, stock_name: str, reports: list[dict], combined: str) -> str:
-        report_list = "\n".join(
-            f"  - [{r.get('date', '')}] {r.get('firm', '')}: {r.get('title', '')}"
-            for r in reports
-        )
-        key_numbers = []
-        for r in reports:
-            key_numbers.extend(r.get("key_numbers", []))
-        nums_str = ", ".join(list(dict.fromkeys(key_numbers))[:6]) or "없음"
-
-        return f"""당신은 금융 리포트를 누구나 쉽게 이해할 수 있게 요약하는 전문가입니다.
-
-## 종목명: {stock_name}
-## 분석 리포트 목록:
-{report_list}
-## 핵심 수치: {nums_str}
-
-## 리포트 원문:
-{combined}
-
----
-**요약 지침:**
-1. 2~3개의 핵심 주제를 중심으로 정리하세요
-2. 고등학생이 이해할 수 있는 쉬운 언어로 작성하세요
-3. 어려운 금융 용어는 괄호 안에 짧게 설명하세요 (예: PER(주가수익비율))
-4. 핵심 숫자·수치는 반드시 포함하세요
-5. 각 주제별로 "왜 중요한지"를 한 문장으로 덧붙이세요
-
-아래 JSON 형식으로만 응답하세요 (마크다운 코드 블록 없이):
-
-{{
-  "stock_name": "{stock_name}",
-  "one_line": "한 줄 핵심 요약 (40자 이내)",
-  "sentiment": "긍정 | 중립 | 부정",
-  "key_themes": ["주제1 제목", "주제2 제목"],
-  "theme_details": [
-    {{
-      "theme": "주제 제목",
-      "content": "쉬운 설명 (80~120자)",
-      "key_stat": "핵심 수치 또는 '없음'",
-      "why_matters": "왜 중요한지 한 문장"
-    }}
-  ],
-  "summary": "전체 흐름 요약 (200~300자, 고등학생 눈높이)"
-}}"""
-
-    # ── LLM Call ─────────────────────────────────────────────────────────────
-
-    def _call_llm(self, prompt: str) -> str:
+    def summarize(self, report: dict) -> dict:
+        """리포트 dict(수집기 결과) → 요약 dict. 모델 실패 시 제목·정규식 기반 최소 요약."""
+        text = (report.get("text") or "").strip()
+        if not text:
+            return fallback_summary(report, "PDF 본문 없음")
+        prompt = (f"종목: {report.get('stock_name')} ({report.get('stock_code') or '코드 미확인'})\n"
+                  f"증권사: {report.get('firm')} · 날짜: {report.get('date')}\n"
+                  f"제목: {report.get('title')}\n\n본문:\n{text[: self.max_chars]}")
+        result = self.router.run("report_summary", prompt, system=SYSTEM, json_schema=SCHEMA)
+        if not result.ok:
+            return fallback_summary(report, "; ".join(result.notes) or "모델 호출 실패")
         try:
-            if self.provider == "claude":
-                msg = self._client.messages.create(
-                    model=self._model, max_tokens=2000,
-                    messages=[{"role": "user", "content": prompt}],
-                )
-                return msg.content[0].text
-            if self.provider == "gemini":
-                return self._client.generate(prompt, max_output_tokens=2000)
-            resp = self._client.chat.completions.create(
-                model=self._model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
-                max_tokens=2000,
-            )
-            return resp.choices[0].message.content
-        except Exception as e:
-            return f'{{"error": "{e}"}}'
+            data = parse_json(result.text)
+        except ValueError:
+            return fallback_summary(report, "요약 형식 오류")
+        return normalize(data, model=result.model)
 
-    # ── Parse ────────────────────────────────────────────────────────────────
 
-    def _parse(self, raw: str, stock_name: str, reports: list[dict]) -> dict:
-        clean = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.MULTILINE)
-        clean = re.sub(r"\s*```\s*$", "", clean.strip(), flags=re.MULTILINE).strip()
-
-        data: dict = {}
+def parse_json(raw: str) -> dict:
+    clean = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip())
+    try:
+        data = json.loads(clean)
+    except json.JSONDecodeError:
+        m = re.search(r"\{.*\}", clean, re.DOTALL)
+        if not m:
+            raise ValueError("JSON 없음") from None
         try:
-            data = json.loads(clean)
-        except Exception:
-            pass
-        if not data:
-            try:
-                m = re.search(r"\{.*\}", clean, re.DOTALL)
-                if m:
-                    data = json.loads(m.group())
-            except Exception:
-                pass
+            data = json.loads(m.group())
+        except json.JSONDecodeError as e:
+            raise ValueError(str(e)) from e
+    if not isinstance(data, dict):
+        raise ValueError("JSON 객체 아님")  # noqa: TRY004 — 호출부가 ValueError로 형식 오류를 처리
+    return data
 
-        if not data or "error" in data:
-            print(f"   ⚠️  {stock_name} 요약 파싱 실패 → fallback 사용")
-            return self._fallback(stock_name, reports)
 
-        data.setdefault("stock_name",   stock_name)
-        data.setdefault("report_count", len(reports))
-        data.setdefault("generated_at", datetime.now().isoformat())
-        return data
+def _price(v) -> int | None:
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return int(v) if v > 0 else None
+    digits = re.sub(r"[^\d]", "", str(v or ""))
+    return int(digits) if digits and int(digits) > 0 else None
 
-    def _fallback(self, stock_name: str, reports: list[dict]) -> dict:
-        nums = []
-        for r in reports:
-            nums.extend(r.get("key_numbers", []))
-        return {
-            "stock_name":    stock_name,
-            "one_line":      f"{stock_name} 분석 리포트 {len(reports)}건",
-            "sentiment":     "중립",
-            "key_themes":    ["투자의견", "목표주가"],
-            "theme_details": [
-                {
-                    "theme":       "투자의견",
-                    "content":     "증권사 분석사들의 투자의견을 정리한 내용입니다.",
-                    "key_stat":    nums[0] if nums else "없음",
-                    "why_matters": "투자 결정에 직접적인 영향을 미칩니다.",
-                }
-            ],
-            "summary":      f"{stock_name}에 대한 {len(reports)}건의 리포트를 수집했습니다. "
-                            f"핵심 수치: {', '.join(nums[:3]) or '없음'}",
-            "report_count": len(reports),
-            "generated_at": datetime.now().isoformat(),
-        }
 
-    # ── Save ─────────────────────────────────────────────────────────────────
+def normalize(data: dict, model: str | None) -> dict:
+    """모델 출력의 형식을 정리합니다 (값을 새로 계산하지 않음)."""
+    def text_list(v, n):
+        return [str(x).strip() for x in v if str(x).strip()][:n] if isinstance(v, list) else []
 
-    def _save(self, summary: dict) -> None:
-        try:
-            os.makedirs(self.output_dir, exist_ok=True)
-            stock = re.sub(r"[^\w가-힣\-]", "_", summary.get("stock_name", "unknown"))
-            path  = os.path.join(self.output_dir, f"{stock}_summary.json")
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(summary, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"   ⚠️  요약 저장 실패: {e}")
+    numbers = []
+    for x in data.get("numbers") or []:
+        if isinstance(x, dict) and x.get("label") and x.get("value"):
+            numbers.append({"label": str(x["label"]), "value": str(x["value"])})
+    return {
+        "one_line":       str(data.get("one_line") or "").strip()[:120],
+        "sentiment":      data.get("sentiment") if data.get("sentiment") in ("긍정", "중립", "부정") else "중립",
+        "opinion":        str(data.get("opinion") or "미확인").strip()[:20],
+        "opinion_change": data.get("opinion_change") if data.get("opinion_change") in _CHANGES else "미확인",
+        "target_price":   _price(data.get("target_price")),
+        "target_change":  data.get("target_change") if data.get("target_change") in _CHANGES else "미확인",
+        "current_price":  _price(data.get("current_price")),
+        "key_points":     text_list(data.get("key_points"), 3),
+        "risks":          text_list(data.get("risks"), 2),
+        "numbers":        numbers[:5],
+        "model":          model,
+        "status":         "ok",
+    }
 
-    # ── LLM Init ─────────────────────────────────────────────────────────────
 
-    def _init_client(self, config: dict):
-        p = self.provider
-        if p == "groq":
-            from groq import Groq
-            self._model = "llama-3.3-70b-versatile"
-            return Groq(api_key=config.get("groq_api_key"))
-        if p == "gemini":
-            from llm.gemini_text import GeminiText
-            client = GeminiText(config, temperature=0.3)
-            self._model = client.model
-            return client
-        if p == "claude":
-            from anthropic import Anthropic
-            self._model = "claude-sonnet-4-6"
-            return Anthropic(api_key=config.get("anthropic_api_key"))
-        raise ValueError(f"Unknown provider: {p}")
+_TARGET_RE = re.compile(r"목표\s*주?가[^\d]{0,15}([\d,]{4,})\s*원")
+
+
+def fallback_summary(report: dict, reason: str) -> dict:
+    """모델 없이 만들 수 있는 최소 요약: 제목 + 본문의 '목표주가 NN원' 표기."""
+    m = _TARGET_RE.search(report.get("text") or "")
+    return {
+        "one_line": str(report.get("title") or "")[:120], "sentiment": "중립",
+        "opinion": "미확인", "opinion_change": "미확인",
+        "target_price": _price(m.group(1)) if m else None, "target_change": "미확인",
+        "current_price": None, "key_points": [], "risks": [],
+        "numbers": [{"label": "추출 수치", "value": v} for v in (report.get("key_numbers") or [])[:5]],
+        "model": None, "status": f"요약 실패: {reason}"[:200],
+    }

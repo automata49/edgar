@@ -2,13 +2,13 @@
 
 ## 프로젝트 개요
 
-시장 데이터(yfinance/CoinGecko), YouTube, RSS 뉴스를 수집·분석해  
-텔레그램으로 전송하는 자동화 봇. Supabase(PostgreSQL)에 모든 데이터 보관.
+시장 데이터(yfinance/CoinGecko), YouTube, RSS 뉴스, 네이버 증권사 리서치 리포트를 수집·분석해  
+Daily·Weekly 리포트로 텔레그램에 전송하는 자동화 봇. Supabase(PostgreSQL)에 모든 데이터 보관.
 
 **인프라**: GitHub Codespaces(개발) → Oracle Cloud ARM VM(운영)  
 **AI**: 멀티 모델 — Gemini 무료 티어(분류·요약·일반 대화·시장 분석, 기본 gemini-3.8-flash) + GPT-6 Astra(종목 분석, 월 $20 상한) · `config/models.yaml` · DeepSeek 사용 안 함  
 **투자 분석**: 계산은 Pepper(automata49/pepper)가 하고 Edgar는 results JSON을 읽어 전달·해석만 함  
-**영상**: Wan2.1 14B (fal.ai) AI 동영상 생성 → YouTube Shorts 자동 업로드
+**리서치**: 네이버 종목분석 리포트 PDF → 리포트별 요약(Gemini) → 종목별 DB(research_reports + stock_research 뷰)
 
 ---
 
@@ -16,15 +16,16 @@
 
 ```
 shared/config.py          ← 전역 CONFIG (모든 모듈이 여기서 설정 읽음)
-database/client.py        ← SupabaseDB (4개 테이블: market_data, youtube_videos, news_articles, reports)
+database/client.py        ← SupabaseDB (market_data, youtube_videos, news_articles, reports, research_reports)
+database/schema.sql       ← 테이블·stock_research 뷰 (Supabase SQL Editor에서 실행, 여러 번 실행해도 안전)
 
 telegram_bot/             ← 사용자 인터페이스
   main.py                 ← Application 생성 + 핸들러 등록 + 스케줄러 시작
   handlers/chat.py        ← 자유 대화 (router_chat 사용)
-  handlers/signal.py      ← /monitor (즉시 실행), /report (최근 리포트)
+  handlers/signal.py      ← /monitor (Daily 즉시 실행), /report (최근 Daily)
   handlers/settings.py    ← /style, /api, /status + InlineKeyboard 콜백
   handlers/pepper.py      ← /pepper, /stock, /budget, /rules
-  handlers/browse.py      ← /view 버튼 메뉴 (Google 시트 + 수집 데이터 조회, "포트폴리오 보여줘" 같은 채팅도 연결)
+  handlers/browse.py      ← /view 버튼 메뉴 (Google 시트 + 수집 데이터 + 증권사 리포트), /research, /weekly
   services/router_chat.py ← 멀티 모델 챗봇 (간단→Gemini, 분석→Astra)
 
 llm/                      ← 멀티 모델 계층
@@ -41,43 +42,37 @@ invest/                   ← Pepper 연동
   views.py                ← 텔레그램 화면 포맷터 (HTML 카드 + 인라인 버튼, 순수 함수)
 
 kstock_signal/            ← 데이터 파이프라인
-  scheduler.py            ← SignalScheduler (전체 파이프라인 오케스트레이터)
-  main.py                 ← 단독 실행 진입점 (--once / --shorts / --korean / --dry 플래그)
+  scheduler.py            ← SignalScheduler (Daily 매일 · Weekly 주 1회 · 리서치 수집)
+  main.py                 ← 단독 실행 진입점 (--once / --weekly / --research / --dry)
+  research.py             ← ResearchPipeline (네이버 리포트 수집 → 요약 → DB, 이미 저장된 리포트는 건너뜀)
+  weekly.py               ← WeeklyReport (지난 7일 집계 + AI 해설)
   collectors/market.py    ← yfinance + CoinGecko (50+ 심볼)
   collectors/youtube.py   ← YouTube Data API + 자막
   collectors/news.py      ← RSS feedparser
-  collectors/naver_report.py     ← 네이버 금융 종목분석 리포트 PDF 수집
-  collectors/shortvideo_trend.py ← YouTube Trending(mostPopular) + 한/영 키워드 트렌드 수집
-  analyzers/trend.py      ← TrendAnalyzer (gemini/groq/claude, 기본 gemini-3.8-flash)
-  analyzers/script.py     ← ScriptGenerator (숏폼 스크립트 생성, 5포맷 + celeb_collab)
-  analyzers/celeb_cast.py ← CelebCaster (리포트→CEO 캐릭터 매핑, 12개 기업 DB)
-  generators/video.py     ← VideoGenerator (PIL+moviepy 정적 렌더러, 6포맷)
-  generators/ai_video.py  ← AIVideoGenerator (Wan2.1 14B 병렬 AI 영상 생성, 폴백: 1.3B→Flux→PIL)
-  generators/heygen.py    ← HeyGenClient (AI 아바타 영상 생성 API)
-  reporters/telegram.py   ← TelegramReporter (메시지 포맷 + 발송)
+  collectors/naver_report.py ← 네이버 금융 종목분석 리포트 목록·PDF 본문 추출
+  analyzers/trend.py      ← TrendAnalyzer (Daily 분석, gemini/groq/claude, 기본 gemini-3.8-flash)
+  analyzers/report_summarizer.py ← 리포트 1건 → JSON 요약 (의견·목표가·핵심 포인트·리스크)
+  reporters/telegram.py   ← TelegramReporter (Daily 메시지 + 긴 텍스트 분할 발송)
+  reporters/research_text.py ← 리서치 요약 텍스트 포맷 (Daily·Weekly·프롬프트 공용)
 ```
 
 ## 데이터 흐름
 
 ```
-SignalScheduler.run()
-  │
-  ├─ MarketCollector.collect()          → dict[symbol, price_data]
-  ├─ YouTubeCollector.collect()         → list[video_dict]
-  ├─ NewsCollector.collect()            → list[article_dict]
-  │
-  ├─ TrendAnalyzer.analyze()            → analysis: str
-  │
-  ├─ SupabaseDB.save_*()                → Supabase 저장
-  ├─ /tmp/latest_report.txt             → /report 명령용 캐시
-  ├─ TelegramReporter.send()            → 텔레그램 발송
-  │
-  └─ [SHORTVIDEO_ENABLED=true 시]
-       ShortVideoTrendCollector.collect() → YouTube Trending + 키워드 트렌드 패턴
-       NaverReportCollector.collect()     → PDF 리포트
-       ScriptGenerator.generate_celeb()  → celeb_collab 스크립트 (LLM)
-       AIVideoGenerator.generate()       → Wan2.1 14B 병렬 클립 → MP4
-       YouTubePublisher.upload()         → YouTube Shorts 업로드
+SignalScheduler.run()  — Daily (매일 REPORT_TIME, 기본 08:00 KST)
+  ├─ MarketCollector / YouTubeCollector / NewsCollector
+  ├─ ResearchPipeline.run()
+  │    NaverReportCollector (새 리포트만) → ReportSummarizer (router: report_summary)
+  │    → SupabaseDB.save_research_reports()
+  ├─ TrendAnalyzer.analyze(market, youtube, news, research)
+  ├─ SupabaseDB.save_*() (reports.kind = 'daily')
+  └─ TelegramReporter.send()  — 시장 · 분석 · 액션 플랜 · 오늘의 증권사 리포트 · 출처
+
+SignalScheduler.run_weekly()  — Weekly (WEEKLY_REPORT_DAY/TIME, 기본 토 09:00 KST)
+  ├─ SupabaseDB: 지난 7일 market_data · research_reports · news_articles · daily reports
+  ├─ 주간 등락률·리서치 종목별 집계 (weekly.py)
+  ├─ ModelRouter.run("weekly_review")  — Astra, 예산 초과·오류 시 Gemini
+  └─ reports.kind = 'weekly' 저장 + 텔레그램 발송
 ```
 
 ---
@@ -88,18 +83,15 @@ SignalScheduler.run()
 # 텔레그램 봇 (스케줄러 포함)
 python telegram_bot/main.py
 
-# 전체 파이프라인 1회 실행
+# Daily 1회 실행 / dry-run (텔레그램 발송 생략)
 python kstock_signal/main.py --once
-
-# 전체 파이프라인 dry-run (텔레그램/업로드 생략)
 python kstock_signal/main.py --once --dry
 
-# 숏폼 영상 파이프라인만 실행 (Wan2.1 AI 영상 생성)
-python kstock_signal/main.py --shorts --dry   # dry-run (영상 생성 O, 업로드 X)
-python kstock_signal/main.py --shorts          # 실제 실행 (영상 생성 + YouTube 업로드)
+# Weekly 1회 (Supabase 데이터 필요)
+python kstock_signal/main.py --weekly --dry
 
-# 한국어 30초 숏폼 파이프라인
-python kstock_signal/main.py --korean --dry
+# 네이버 리서치 리포트만 수집·요약·저장
+python kstock_signal/main.py --research
 
 # 헬스 체크
 python scripts/health_check.py
@@ -109,8 +101,6 @@ python scripts/health_check.py
 
 ## 환경변수 (.env)
 
-| 변수 | 필수 | 설명 |
-|------|------|------|
 | 변수 | 필수 | 설명 |
 |------|------|------|
 | TELEGRAM_BOT_TOKEN    | ✅ | 텔레그램 봇 |
@@ -125,18 +115,17 @@ python scripts/health_check.py
 | EDGAR_MODELS_CONFIG   | 선택 | 모델 설정 파일 경로 (기본 config/models.yaml) |
 | ANTHROPIC_API_KEY     | 선택 | 기존 Claude 챗봇 (현재 봇은 router_chat 사용) |
 | YOUTUBE_API_KEY       | 권장 | YouTube 수집 + 트렌드 수집 |
-| FAL_KEY               | 권장 | fal.ai Wan2.1 AI 영상 생성 (https://fal.ai) |
-| SHORTS_AI_BACKEND     | 선택 | **wan2**(권장) \| pollinations(무료) \| hf \| flux \| pil |
-| SHORTVIDEO_ENABLED    | 선택 | true 시 숏폼 파이프라인 활성화 (기본 false) |
-| HF_TOKEN              | 선택 | HuggingFace 토큰 (hf 백엔드 사용 시) |
 | SUPABASE_URL          | 선택 | DB 저장 |
 | SUPABASE_KEY          | 선택 | DB 저장 |
 | LLM_PROVIDER          | 선택 | gemini(기본)/groq/claude — 시장 분석·대본·리포트 요약용 |
 | GEMINI_MODEL          | 선택 | 파이프라인 Gemini 모델 (기본 gemini-3.8-flash, 실패 시 gemini-3.6-flash) |
 | REPORT_STYLE          | 선택 | aggressive/professional/... |
-| REPORT_TIME           | 선택 | HH:MM (기본 08:00) |
-| HEYGEN_API_KEY        | 선택 | HeyGen AI 아바타 영상 생성 |
-| KOREAN_SHORTS_ENABLED | 선택 | true 시 한국어 30초 숏폼 파이프라인 활성화 |
+| REPORT_TIME           | 선택 | Daily 시각 HH:MM (기본 08:00 KST) |
+| WEEKLY_REPORT_DAY     | 선택 | Weekly 요일 mon~sun (기본 sat) |
+| WEEKLY_REPORT_TIME    | 선택 | Weekly 시각 HH:MM (기본 09:00 KST) |
+| NAVER_TARGETS         | 선택 | 리서치 대상 종목명/코드 (쉼표 구분, 비우면 전체) |
+| NAVER_MAX_REPORTS     | 선택 | 1회 실행당 새로 요약할 최대 리포트 수 (기본 20) |
+| NAVER_PAGES           | 선택 | 네이버 목록 페이지 수 (기본 2, 페이지당 약 30건) |
 
 ---
 

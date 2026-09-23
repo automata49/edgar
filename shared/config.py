@@ -83,59 +83,20 @@ CONFIG: dict = {
 
     # ── Schedule ─────────────────────────────────────────────
     "schedule": {
-        "daily_report_time": os.getenv("REPORT_TIME", "08:00"),
+        "daily_report_time":  os.getenv("REPORT_TIME", "08:00"),
+        # 주간 리포트: 요일(mon~sun) + 시각, KST
+        "weekly_report_day":  os.getenv("WEEKLY_REPORT_DAY", "sat"),
+        "weekly_report_time": os.getenv("WEEKLY_REPORT_TIME", "09:00"),
         "enabled": True,
     },
 
-    # ── Naver Research Report ─────────────────────────────────
+    # ── Naver Research Report (종목분석 리포트 → 요약 → 종목별 DB) ──
     "naver_report": {
-        "target_symbols": [],
-        "max_reports": 3,
+        # 비우면 전체 종목. 예: NAVER_TARGETS="삼성전자,SK하이닉스,005930"
+        "target_symbols": [x.strip() for x in os.getenv("NAVER_TARGETS", "").split(",") if x.strip()],
+        "max_reports": int(os.getenv("NAVER_MAX_REPORTS", "20")),   # 1회 실행당 새로 요약할 최대 건수
+        "pages":       int(os.getenv("NAVER_PAGES", "2")),          # 목록 페이지 수 (페이지당 약 30건)
+        "max_text_chars": 6000,                                     # 요약에 넣을 PDF 본문 길이
         "save_dir": os.getenv("NAVER_REPORT_DIR", os.path.join(_PROJECT_ROOT, "data", "naver_reports")),
-    },
-
-    # ── Report Summary (1단계: 종목별 한국어 요약) ────────────────
-    "report_summary": {
-        "output_dir": os.getenv("SUMMARY_DIR", os.path.join(_PROJECT_ROOT, "data", "summaries")),
-        "max_text_chars": 3000,
-    },
-
-    # ── Korean Short Script (2단계: 30초 한국어 대본) ─────────────
-    "korean_script": {
-        "output_dir": os.getenv("KSCRIPT_DIR", os.path.join(_PROJECT_ROOT, "data", "scripts")),
-        "video_dir":  os.getenv("KVIDEO_DIR",  os.path.join(_PROJECT_ROOT, "data", "videos")),
-    },
-
-    # ── Korean Shorts Pipeline 통합 스위치 ────────────────────────
-    "korean_shorts": {
-        "enabled":          os.getenv("KOREAN_SHORTS_ENABLED", "false").lower() == "true",
-        "notify_telegram":  os.getenv("KOREAN_SHORTS_NOTIFY", "true").lower() == "true",
-        "max_reports":      int(os.getenv("KOREAN_SHORTS_MAX", "5")),
-    },
-
-    # ── Short-form Video Pipeline ─────────────────────────────
-    "shortvideo": {
-        "enabled":           os.getenv("SHORTVIDEO_ENABLED", "false").lower() == "true",
-        "trend_max_results": 10,
-        "output_dir":        os.getenv("SHORTS_OUTPUT_DIR", os.path.join(_PROJECT_ROOT, "output", "shorts")),
-        # AI 영상 백엔드
-        #   pollinations — Pollinations.ai Flux.1  키 불필요·완전 무료  ← 기본값
-        #   horde        — StableHorde SDXL  커뮤니티GPU·완전 무료오픈소스
-        #   hf           — HuggingFace FLUX.1-schnell  무료(HF_TOKEN 권장)
-        #   flux         — fal.ai Flux  고품질         (FAL_KEY 필요)
-        #   wan2         — fal.ai Wan2.1 실제 AI 영상  (FAL_KEY 필요)
-        #   pil          — 향상된 PIL 로컬 렌더러
-        "ai_backend":        os.getenv("SHORTS_AI_BACKEND", "pollinations"),
-    },
-
-    # ── fal.ai (Flux / Wan2.1 오픈소스 모델) ──────────────────
-    "fal_api_key":  os.getenv("FAL_KEY", ""),
-
-    # ── YouTube Shorts Upload ─────────────────────────────────
-    "youtube_shorts": {
-        "client_secrets_file": os.getenv("YOUTUBE_CLIENT_SECRETS", ""),
-        "credentials_file":    os.getenv("YOUTUBE_CREDENTIALS_FILE", "/tmp/yt_credentials.json"),
-        "category_id":         "22",
-        "privacy_status":      os.getenv("YOUTUBE_PRIVACY", "public"),
     },
 }

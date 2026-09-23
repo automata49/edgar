@@ -94,6 +94,15 @@ async def build_page(context: ContextTypes.DEFAULT_TYPE, key: str) -> views.Page
             return views.news(await _db_call(context, "recent_news", 40) or [], page)
         return views.videos(await _db_call(context, "recent_videos", 40) or [], page)
 
+    if view in ("rr", "wk"):
+        if context.bot_data.get("db") is None:
+            return views.unavailable("증권사 리포트" if view == "rr" else "Weekly 리포트", _DB_HINT)
+        if view == "wk":
+            return views.weekly(await _db_call(context, "latest_report_of", "weekly"))
+        if arg:
+            return views.research_reports(await _db_call(context, "research_by_stock", arg, 8) or [], arg)
+        return views.research_stocks(await _db_call(context, "research_stocks", 60) or [])
+
     if view in ("mkt", "rpt"):
         rep = await _db_call(context, "latest_report")
         if view == "mkt":
@@ -127,7 +136,7 @@ async def send_page(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str
 
 
 async def view_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """/view [pf|rs|fin|val|px|mkt|news|yt|rpt|pep] [TICKER]"""
+    """/view [pf|rs|fin|val|px|mkt|news|yt|rpt|wk|rr|pep] [TICKER|종목]"""
     if not is_allowed(update):
         await update.message.reply_text("🔒 이 명령은 등록된 사용자만 쓸 수 있습니다.")
         return
@@ -135,7 +144,10 @@ async def view_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     view = args[0].lower() if args else "home"
     arg = args[1] if len(args) > 1 else None
     if arg:
-        arg = arg.lower() if view == "mkt" else arg.upper()   # 시장 분류는 소문자, 종목은 대문자
+        if view == "mkt":
+            arg = arg.lower()                      # 시장 분류는 소문자
+        elif view != "rr":
+            arg = arg.upper()                      # 티커는 대문자 (rr 은 한글 종목명 그대로)
     key = f"{view}:{arg}" if arg else view
     if key in ("news", "yt"):
         key += ":1"
@@ -178,6 +190,19 @@ async def _ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, ticker: 
 
 
 _TICKER = re.compile(r"[A-Za-z0-9_.]{2,12}")
+_WORD = re.compile(r"[가-힣A-Za-z0-9&]+")
+_NOT_STOCK = re.compile(r"^(증권사|리서치|리포트|보고서|애널리스트|목표|주가|목표주가|최근|오늘|이번|주|좀|요약|"
+                        r"보여.*|확인.*|알려.*|조회.*|봐.*|볼래|열어.*|정리.*|현황|목록)$")
+_JOSA = re.compile(r"(의|를|을|은|는|이|가|에|도)$")
+
+
+def _stock_from_text(text: str) -> str | None:
+    """'삼성전자 증권사 리포트 보여줘' → '삼성전자'. 종목으로 볼 단어가 없으면 None."""
+    for w in _WORD.findall(text):
+        w = _JOSA.sub("", w) if len(w) > 2 else w
+        if len(w) >= 2 and not _NOT_STOCK.match(w):
+            return w[:15]
+    return None
 
 
 async def try_view_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -186,6 +211,8 @@ async def try_view_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     key = views.match_view(text)
     if key is None or not is_allowed(update):
         return False
+    if key == "rr" and (stock := _stock_from_text(text)):
+        key = f"rr:{stock}"
     if key in ("pf", "rs", "fin", "pep"):
         words = {w.upper() for w in _TICKER.findall(text)}
         known: set[str] = set()
@@ -200,3 +227,31 @@ async def try_view_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             key = f"{key}:{hit[0]}"
     await send_page(update, context, key)
     return True
+
+
+async def research_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/research [종목명|코드] — 증권사 리포트 종목별 목록 또는 한 종목 상세."""
+    if not is_allowed(update):
+        await update.message.reply_text("🔒 이 명령은 등록된 사용자만 쓸 수 있습니다.")
+        return
+    query = " ".join(context.args or []).strip()
+    await send_page(update, context, f"rr:{query}" if query else "rr")
+
+
+async def weekly_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/weekly — 지난 7일 Weekly 리포트를 지금 만들어 요청한 채팅으로 보냅니다."""
+    if not is_allowed(update):
+        await update.message.reply_text("🔒 이 명령은 등록된 사용자만 쓸 수 있습니다.")
+        return
+    scheduler = context.bot_data.get("scheduler")
+    if scheduler is None or context.bot_data.get("db") is None:
+        await update.message.reply_text("⚠️ Weekly 리포트는 Supabase에 저장된 데이터가 필요합니다.")
+        return
+    await update.message.reply_text("🗓 Weekly 리포트를 만드는 중입니다… (30초~1분)")
+    try:
+        report = await scheduler.run_weekly(chat_ids=[update.effective_chat.id])
+    except Exception as e:  # noqa: BLE001 — 봇이 멈추지 않도록
+        logger.warning("Weekly 생성 실패: %s", e)
+        report = None
+    if report is None:
+        await update.message.reply_text("⚠️ Weekly 리포트를 만들지 못했습니다. 로그를 확인하세요.")

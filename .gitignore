@@ -11,3 +11,6 @@ echo "*.key.pub" >> /workspaces/Edgar/.gitignore
 
 # LLM 사용액 장부 (개인 기록)
 data/llm_usage.csv
+
+# 네이버 리서치 리포트 PDF (다운로드 원본, 요약은 Supabase research_reports)
+data/naver_reports/
