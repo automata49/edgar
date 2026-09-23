@@ -43,6 +43,8 @@ async def stock_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     chat = context.bot_data["chat"]
     result = await asyncio.to_thread(chat.analyze, ticker, " ".join(context.args[1:]))
     tail = f"\n\n— {result.model or '모델 없음'}" + (f" · ${result.cost_usd:.3f}" if result.cost_usd else "")
+    if result.downgraded and result.ok:
+        tail += " (대체 모델)"
     await _send_long(update, result.text + tail)
 
 

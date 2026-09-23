@@ -82,6 +82,19 @@ class RouterTests(unittest.TestCase):
         self.assertEqual(r.providers["gemini"].calls, [])
         self.assertIn("Pepper 계산 결과", res.text)
 
+    def test_failure_text_hides_raw_provider_errors(self):
+        raw = "Error code: 429 - {'error': {'code': 'insufficient_quota'}}"
+        openai, gemini = FakeProvider("openai"), FakeProvider("gemini")
+
+        def boom(*a, **k):
+            raise ProviderError(raw)
+        openai.generate = gemini.generate = boom
+        res = make(self.tmp, openai=openai, gemini=gemini).run("stock_analysis", "NVDA")
+        self.assertFalse(res.ok)
+        self.assertNotIn("{", res.text)
+        self.assertIn("gpt-6-astra: API 크레딧 부족", res.text)
+        self.assertNotIn("대체 모델로 답변", res.text)
+
     def test_provider_error_still_bills_consumed_tokens(self):
         r = make(self.tmp, openai=FakeProvider("openai", fail=True, fail_usage=Usage(1000, 0, 4000)))
         res = r.run("stock_analysis", "NVDA")

@@ -26,6 +26,24 @@ from llm.providers import ProviderError, build
 logger = logging.getLogger(__name__)
 
 
+def _brief(e: Exception) -> str:
+    """사용자에게 보여줄 짧은 실패 사유. 원문은 로그에만 남깁니다."""
+    msg = str(e)
+    if "insufficient_quota" in msg or "credit" in msg.lower():
+        return "API 크레딧 부족"
+    if "429" in msg:
+        return "요청 한도 초과"
+    if "503" in msg or "UNAVAILABLE" in msg:
+        return "일시적 과부하"
+    if "404" in msg or "NOT_FOUND" in msg:
+        return "모델을 찾을 수 없음"
+    if "API_KEY" in msg:
+        return "API 키 미설정"
+    if "빈 응답" in msg:
+        return "빈 응답"
+    return "호출 실패"
+
+
 @dataclass
 class LLMResult:
     text: str
@@ -134,7 +152,7 @@ class ModelRouter:
                     else:
                         self.ledger.release(reserved)
                 logger.warning("%s/%s 실패: %s", m["provider"], m["model"], e)
-                out.notes.append(str(e))
+                out.notes.append(f"{m['model']}: {_brief(e)}")
                 continue
             cost = cost_usd(self.pricing, m["model"], usage) if m["model"] in self.pricing else 0.0
             if tier.get("paid"):
