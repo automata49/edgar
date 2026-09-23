@@ -15,7 +15,7 @@ class TrendAnalyzer:
     }
 
     def __init__(self, config: dict) -> None:
-        self.provider = config.get("llm_provider", "deepseek")
+        self.provider = config.get("llm_provider", "gemini")
         self.style    = config.get("report_style", "aggressive")
         self.temp     = self.STYLES.get(self.style, self.STYLES["aggressive"])["temp"]
         self._client  = self._init_client(config)
@@ -29,20 +29,15 @@ class TrendAnalyzer:
 
     def _init_client(self, config: dict):
         p = self.provider
-        if p == "deepseek":
-            from openai import OpenAI
-            client = OpenAI(api_key=config.get("deepseek_api_key"), base_url="https://api.deepseek.com")
-            self._model = "deepseek-chat"
-            return client
         if p == "groq":
             from groq import Groq
             self._model = "llama-3.3-70b-versatile"
             return Groq(api_key=config.get("groq_api_key"))
         if p == "gemini":
-            import google.generativeai as genai
-            genai.configure(api_key=config.get("gemini_api_key"))
-            self._model = "gemini-pro"
-            return genai.GenerativeModel(self._model)
+            from llm.gemini_text import GeminiText
+            client = GeminiText(config, temperature=self.temp)
+            self._model = client.model
+            return client
         if p == "claude":
             from anthropic import Anthropic
             self._model = "claude-sonnet-4-20250514"
@@ -109,14 +104,14 @@ class TrendAnalyzer:
     def _call(self, prompt: str) -> str:
         try:
             if self.provider == "gemini":
-                return self._client.generate_content(prompt).text
+                return self._client.generate(prompt, max_output_tokens=3000)
             if self.provider == "claude":
                 msg = self._client.messages.create(
                     model=self._model, max_tokens=3000,
                     messages=[{"role": "user", "content": prompt}],
                 )
                 return msg.content[0].text
-            # openai-compatible (deepseek, groq)
+            # openai-compatible (groq)
             resp = self._client.chat.completions.create(
                 model=self._model,
                 messages=[{"role": "user", "content": prompt}],

@@ -6,7 +6,7 @@
 텔레그램으로 전송하는 자동화 봇. Supabase(PostgreSQL)에 모든 데이터 보관.
 
 **인프라**: GitHub Codespaces(개발) → Oracle Cloud ARM VM(운영)  
-**AI**: 멀티 모델 — Gemini 무료 티어(분류·요약·일반 대화) + GPT-6 Astra(종목 분석, 월 $20 상한) · `config/models.yaml`  
+**AI**: 멀티 모델 — Gemini 무료 티어(분류·요약·일반 대화·시장 분석, 기본 gemini-3.8-flash) + GPT-6 Astra(종목 분석, 월 $20 상한) · `config/models.yaml` · DeepSeek 사용 안 함  
 **투자 분석**: 계산은 Pepper(automata49/pepper)가 하고 Edgar는 results JSON을 읽어 전달·해석만 함  
 **영상**: Wan2.1 14B (fal.ai) AI 동영상 생성 → YouTube Shorts 자동 업로드
 
@@ -31,6 +31,7 @@ llm/                      ← 멀티 모델 계층
   router.py               ← task → tier → 모델 선택, 예산 초과/오류 시 무료 모델로 대체
   budget.py               ← Astra 사용액 장부(data/llm_usage.csv) + 월 상한 가드
   providers/__init__.py   ← GeminiProvider, OpenAIProvider(Responses API)
+  gemini_text.py          ← 파이프라인 분석기용 Gemini 호출 (3.8 Flash → 3.6 Flash 대체)
 config/models.yaml        ← 모델·가격·작업별 티어·월 예산
 
 invest/                   ← Pepper 연동
@@ -47,7 +48,7 @@ kstock_signal/            ← 데이터 파이프라인
   collectors/news.py      ← RSS feedparser
   collectors/naver_report.py     ← 네이버 금융 종목분석 리포트 PDF 수집
   collectors/shortvideo_trend.py ← YouTube Trending(mostPopular) + 한/영 키워드 트렌드 수집
-  analyzers/trend.py      ← TrendAnalyzer (deepseek/groq/gemini/claude)
+  analyzers/trend.py      ← TrendAnalyzer (gemini/groq/claude, 기본 gemini-3.8-flash)
   analyzers/script.py     ← ScriptGenerator (숏폼 스크립트 생성, 5포맷 + celeb_collab)
   analyzers/celeb_cast.py ← CelebCaster (리포트→CEO 캐릭터 매핑, 12개 기업 DB)
   generators/video.py     ← VideoGenerator (PIL+moviepy 정적 렌더러, 6포맷)
@@ -123,7 +124,6 @@ python scripts/health_check.py
 | TELEGRAM_ALLOWED_IDS  | 선택 | /view 사용 가능한 텔레그램 user ID (쉼표 구분, 기본 report_recipients의 개인 ID) |
 | EDGAR_MODELS_CONFIG   | 선택 | 모델 설정 파일 경로 (기본 config/models.yaml) |
 | ANTHROPIC_API_KEY     | 선택 | 기존 Claude 챗봇 (현재 봇은 router_chat 사용) |
-| DEEPSEEK_API_KEY      | 권장 | 시장 분석 LLM |
 | YOUTUBE_API_KEY       | 권장 | YouTube 수집 + 트렌드 수집 |
 | FAL_KEY               | 권장 | fal.ai Wan2.1 AI 영상 생성 (https://fal.ai) |
 | SHORTS_AI_BACKEND     | 선택 | **wan2**(권장) \| pollinations(무료) \| hf \| flux \| pil |
@@ -131,7 +131,8 @@ python scripts/health_check.py
 | HF_TOKEN              | 선택 | HuggingFace 토큰 (hf 백엔드 사용 시) |
 | SUPABASE_URL          | 선택 | DB 저장 |
 | SUPABASE_KEY          | 선택 | DB 저장 |
-| LLM_PROVIDER          | 선택 | deepseek/groq/gemini/claude |
+| LLM_PROVIDER          | 선택 | gemini(기본)/groq/claude — 시장 분석·대본·리포트 요약용 |
+| GEMINI_MODEL          | 선택 | 파이프라인 Gemini 모델 (기본 gemini-3.8-flash, 실패 시 gemini-3.6-flash) |
 | REPORT_STYLE          | 선택 | aggressive/professional/... |
 | REPORT_TIME           | 선택 | HH:MM (기본 08:00) |
 | HEYGEN_API_KEY        | 선택 | HeyGen AI 아바타 영상 생성 |

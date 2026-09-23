@@ -9,7 +9,6 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 CONFIG: dict = {
     # ── API Keys ─────────────────────────────────────────────
-    "deepseek_api_key":  os.getenv("DEEPSEEK_API_KEY"),
     "groq_api_key":      os.getenv("GROQ_API_KEY"),
     "gemini_api_key":    os.getenv("GEMINI_API_KEY"),
     "anthropic_api_key": os.getenv("ANTHROPIC_API_KEY"),
@@ -35,7 +34,11 @@ CONFIG: dict = {
     "supabase_key": os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY"),
 
     # ── LLM ──────────────────────────────────────────────────
-    "llm_provider":  os.getenv("LLM_PROVIDER", "deepseek"),
+    # 시장 분석·숏폼 대본·리포트 요약 LLM: gemini(기본) | groq | claude. DeepSeek은 사용하지 않음
+    "llm_provider":  os.getenv("LLM_PROVIDER", "gemini").lower().replace("deepseek", "gemini"),
+    "gemini_model":  os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
+    # 기본 모델이 과부하(503)·오류일 때 차례로 시도 (config/models.yaml free 티어와 같은 순서)
+    "gemini_fallback_models": ["gemini-3.6-flash"],
     "report_style":  os.getenv("REPORT_STYLE", "aggressive"),
 
     # ── YouTube Channels ─────────────────────────────────────

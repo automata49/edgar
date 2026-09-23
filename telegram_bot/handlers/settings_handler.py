@@ -23,12 +23,11 @@ async def style_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def api_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = [
-        [InlineKeyboardButton("🔍 DeepSeek", callback_data="api_deepseek"),
-         InlineKeyboardButton("⚡ Groq",     callback_data="api_groq")],
-        [InlineKeyboardButton("🌟 Gemini",   callback_data="api_gemini"),
+        [InlineKeyboardButton("🌟 Gemini 3.8 Flash", callback_data="api_gemini")],
+        [InlineKeyboardButton("⚡ Groq",     callback_data="api_groq"),
          InlineKeyboardButton("🤖 Claude",   callback_data="api_claude")],
     ]
-    current = CONFIG.get("llm_provider", "deepseek")
+    current = CONFIG.get("llm_provider", "gemini")
     await update.message.reply_text(
         f"현재: {current}\nAI 제공자를 선택하세요:",
         reply_markup=InlineKeyboardMarkup(keyboard),
@@ -40,7 +39,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     yt_count  = sum(len(v) for v in CONFIG.get("youtube_channels", {}).values())
     await update.message.reply_text(
         f"📊 봇 상태\n\n"
-        f"🤖 AI: {CONFIG.get('llm_provider', 'deepseek')}\n"
+        f"🤖 AI: {CONFIG.get('llm_provider', 'gemini')}\n"
         f"📝 스타일: {CONFIG.get('report_style', 'aggressive')}\n"
         f"⏰ 리포트: {CONFIG.get('schedule', {}).get('daily_report_time', '08:00')} KST\n\n"
         f"📺 YouTube 채널: {yt_count}개\n"
@@ -66,5 +65,8 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     elif data.startswith("api_"):
         provider = data.split("_", 1)[1]
+        if provider not in ("gemini", "groq", "claude"):   # 예전 메뉴의 DeepSeek 버튼 등
+            await query.edit_message_text(f"⚠️ {provider}는 사용하지 않습니다. /api 로 다시 선택하세요.")
+            return
         CONFIG["llm_provider"] = provider
         await query.edit_message_text(f"✅ AI 변경: {provider}\n다음 실행부터 적용됩니다.")

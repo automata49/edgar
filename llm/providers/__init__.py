@@ -30,9 +30,12 @@ class GeminiProvider:
         return self._client
 
     def generate(self, model: str, prompt: str, system: str | None, max_output_tokens: int,
-                 reasoning: str | None = None, json_schema: dict | None = None) -> tuple[str, Usage]:
+                 reasoning: str | None = None, json_schema: dict | None = None,
+                 temperature: float | None = None) -> tuple[str, Usage]:
         from google.genai import types
         cfg = {"system_instruction": system, "max_output_tokens": max_output_tokens}
+        if temperature is not None:
+            cfg["temperature"] = temperature
         if json_schema:
             cfg.update(response_mime_type="application/json", response_json_schema=json_schema)
         try:

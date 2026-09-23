@@ -17,7 +17,7 @@ class ReportSummarizer:
     """
 
     def __init__(self, config: dict) -> None:
-        self.provider    = config.get("llm_provider", "deepseek")
+        self.provider    = config.get("llm_provider", "gemini")
         cfg              = config.get("report_summary", {})
         self.output_dir: str = cfg.get("output_dir", "data/summaries")
         self.max_chars:  int = cfg.get("max_text_chars", 3000)
@@ -124,7 +124,7 @@ class ReportSummarizer:
                 )
                 return msg.content[0].text
             if self.provider == "gemini":
-                return self._client.generate_content(prompt).text
+                return self._client.generate(prompt, max_output_tokens=2000)
             resp = self._client.chat.completions.create(
                 model=self._model,
                 messages=[{"role": "user", "content": prompt}],
@@ -202,19 +202,15 @@ class ReportSummarizer:
 
     def _init_client(self, config: dict):
         p = self.provider
-        if p == "deepseek":
-            from openai import OpenAI
-            self._model = "deepseek-chat"
-            return OpenAI(api_key=config.get("deepseek_api_key"), base_url="https://api.deepseek.com")
         if p == "groq":
             from groq import Groq
             self._model = "llama-3.3-70b-versatile"
             return Groq(api_key=config.get("groq_api_key"))
         if p == "gemini":
-            import google.generativeai as genai
-            genai.configure(api_key=config.get("gemini_api_key"))
-            self._model = "gemini-pro"
-            return genai.GenerativeModel(self._model)
+            from llm.gemini_text import GeminiText
+            client = GeminiText(config, temperature=0.3)
+            self._model = client.model
+            return client
         if p == "claude":
             from anthropic import Anthropic
             self._model = "claude-sonnet-4-6"
