@@ -8,3 +8,6 @@ __pycache__/
 *.pyc
 echo "*.key" >> /workspaces/Edgar/.gitignore
 echo "*.key.pub" >> /workspaces/Edgar/.gitignore
+
+# LLM 사용액 장부 (개인 기록)
+data/llm_usage.csv

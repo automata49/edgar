@@ -19,11 +19,13 @@ from telegram.ext import (
 from shared.config import CONFIG
 from database.client import SupabaseDB
 from kstock_signal.scheduler import SignalScheduler
-from telegram_bot.services.claude_chat import ClaudeChat
+from llm.router import ModelRouter
+from telegram_bot.services.router_chat import RouterChat
 from telegram_bot.handlers.chat import (
     clear_command, handle_message, help_command, start_command,
 )
 from telegram_bot.handlers.signal import monitor_command, report_command
+from telegram_bot.handlers.pepper import budget_command, pepper_command, rules_command, stock_command
 from telegram_bot.handlers.settings_handler import (
     api_command, callback_handler, status_command, style_command,
 )
@@ -53,7 +55,8 @@ def create_app() -> Application:
 
     # 공유 객체
     db = build_db()
-    app.bot_data["claude_chat"] = ClaudeChat(CONFIG.get("anthropic_api_key", ""))
+    router = ModelRouter.from_config(CONFIG.get("models_config"))
+    app.bot_data["chat"]        = RouterChat(router, CONFIG.get("pepper_results"))
     app.bot_data["scheduler"]   = SignalScheduler(CONFIG, bot=app.bot, db=db)
     app.bot_data["db"]          = db
 
@@ -66,6 +69,10 @@ def create_app() -> Application:
     app.add_handler(CommandHandler("style",   style_command))
     app.add_handler(CommandHandler("api",     api_command))
     app.add_handler(CommandHandler("status",  status_command))
+    app.add_handler(CommandHandler("pepper",  pepper_command))
+    app.add_handler(CommandHandler("stock",   stock_command))
+    app.add_handler(CommandHandler("budget",  budget_command))
+    app.add_handler(CommandHandler("rules",   rules_command))
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 

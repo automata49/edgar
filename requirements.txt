@@ -14,7 +14,9 @@ feedparser>=6.0
 
 # ── AI / LLM ──────────────────────────────────────────────────────────────────
 anthropic>=0.40
-openai>=1.50          # deepseek 호환
+openai>=1.99          # GPT-6 Astra (Responses API) + deepseek 호환
+google-genai>=1.30    # Gemini 무료 티어
+PyYAML>=6.0           # config/models.yaml
 groq>=0.11
 
 # ── Google / YouTube ─────────────────────────────────────────────────────────
