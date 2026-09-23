@@ -100,7 +100,7 @@ class RouterTests(unittest.TestCase):
             return orig(model, *a, **k)
         g.generate = flaky
         res = make(self.tmp, gemini=g).run("chat_general", "hi")
-        self.assertEqual(res.model, "gemini-2.5-flash")
+        self.assertEqual(res.model, "gemini-3.6-flash")
 
     def test_worst_case_reservation(self):
         r = make(self.tmp)

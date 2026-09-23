@@ -95,8 +95,9 @@ class ModelRouter:
         if fb and not private:
             down = self._run_tier(task, fb, prompt, system, json_schema)
             down.downgraded = True
-            down.notes = result.notes + down.notes + [f"{tier_name} → {fb} 대체 모델로 답변"]
+            down.notes = result.notes + down.notes
             if down.ok:
+                down.notes.append(f"{tier_name} → {fb} 대체 모델로 답변")
                 return down
             result.notes = down.notes
         elif private:
